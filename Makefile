@@ -8,7 +8,7 @@ all: build build/CMakeLists.txt.copy
 build:
 	mkdir -p build
 
-build/CMakeLists.txt.copy: CMakeLists.txt msg srv
+build/CMakeLists.txt.copy: CMakeLists.txt #msg srv
 	cp CMakeLists.txt build/CMakeLists.txt.copy
 	cd build && cmake ..
 
