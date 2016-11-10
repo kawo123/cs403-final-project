@@ -147,8 +147,18 @@ void DepthImageCallback(const sensor_msgs::Image& depth_image){
   ROS_INFO("DepthImageCallback called");
 
   //ransac for cylinders
+  vector<Vector3f> filtered_point_cloud; 
+  filtered_point_cloud = GetCylinderFilteredPointCloud(point_cloud, filtered_point_cloud);
+
   //use checkCylinder and getBestCylinder
 
+}
+
+bool GetCylinderFilteredPointCloud(point_cloud, filtered_point_cloud){
+  // Fast plane filtering for cylinders
+
+
+  return true; 
 }
 
 void bestCylinder(){
