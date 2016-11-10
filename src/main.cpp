@@ -95,7 +95,7 @@ bool checkCylinder(const struct cylinder){//given a struct cylinder
   float r = req.cylinder.r;
 
   if(r > 0.4 and r<0.8){
-    if((p0 - screenP0).dot(l)){
+    if((p0 - screenP0).dot(l) == 0){
       return true;
     }
   }
