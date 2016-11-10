@@ -56,6 +56,9 @@ ros::Publisher PointCloudPublisher;
 ros::Publisher screenPublisher;
 ros::Publisher markerPublisher;
 
+// Function declaration
+bool GetCylinderFilteredPointCloud(vector<Vector3f> point_cloud, vector<Vector3f> filtered_point_cloud); 
+
 
 // Helper function to convert ROS Point32 to Eigen Vectors.
 Vector3f ConvertPointToVector(const Point32& point) {
@@ -102,6 +105,10 @@ struct cylinder getBestCylinder(vector<Vector3f> filteredPointCloud){
 
 void DepthImageCallback(const sensor_msgs::Image& depth_image){
 	vector<Vector3f> temp_point_cloud;
+
+  // Setting random seed
+  srand(time(NULL)); 
+
 	int count = 10;
   	for (unsigned int y = 0; y < depth_image.height; ++y) {
     for (unsigned int x = 0; x < depth_image.width; ++x) {
@@ -148,15 +155,31 @@ void DepthImageCallback(const sensor_msgs::Image& depth_image){
 
   //ransac for cylinders
   vector<Vector3f> filtered_point_cloud; 
-  filtered_point_cloud = GetCylinderFilteredPointCloud(point_cloud, filtered_point_cloud);
+  GetCylinderFilteredPointCloud(point_cloud, filtered_point_cloud);
 
   //use checkCylinder and getBestCylinder
 
 }
 
-bool GetCylinderFilteredPointCloud(point_cloud, filtered_point_cloud){
-  // Fast plane filtering for cylinders
+bool GetCylinderFilteredPointCloud(vector<Vector3f> point_cloud, vector<Vector3f> filtered_point_cloud){
+  // user variables
+  int max_neighborhoods = 0;
+  int neightborhood_size = 100; 
+  int num_local_sample = 5; 
+  int point_cloud_size = point_cloud.size(); 
 
+  // Fast plane filtering for cylinders
+  int i = 0; 
+  int neighborhood_counter = 0; 
+  while(i < point_cloud_size && neighborhood_counter < max_neighborhoods){
+
+    Vector3f randomD0 = point_cloud[rand() % point_cloud_size];
+    // Vector3f randomD1 = point_cloud[rand() % point_cloud_size];
+    // Vector3f randomD2 = point_cloud[rand() % point_cloud_size];
+
+    i++; 
+    neighborhood_counter++; 
+  }
 
   return true; 
 }
