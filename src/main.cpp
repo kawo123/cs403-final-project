@@ -89,7 +89,18 @@ bool checkCylinder(const struct cylinder){//given a struct cylinder
 	//checks if cylinder radius is acceptable and whether or not the line corresponding with the cylinder intercepts the projector plane (rviz projector plane)
 	//if yes, return true
 	//if not return false
-  return true;
+
+  Vector3f p0 = req.cylinder.p0;
+  Vector3f l = req.cylinder.l;
+  float r = req.cylinder.r;
+
+  if(r > 0.4 and r<0.8){
+    if((p0 - screenP0).dot(l)){
+      return true;
+    }
+  }
+
+  return false;
 }
 
 bool displayScreen(const vector<struct cylinder>){
@@ -184,10 +195,6 @@ bool GetCylinderFilteredPointCloud(vector<Vector3f> point_cloud, vector<Vector3f
   return true; 
 }
 
-void bestCylinder(){
-	//finds best fit cylinder for filtered point cloud
-
-}
 
 int main(int argc, char **argv) {
   ros::init(argc, argv, "compsci403_final");
