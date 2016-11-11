@@ -86,17 +86,17 @@ bool checkCylinder(const struct cylinder){//given a struct cylinder
 	//if yes, return true
 	//if not return false
 
-  Vector3f p0 = req.cylinder.p0;
-  Vector3f l = req.cylinder.l;
-  float r = req.cylinder.r;
+  // Vector3f p0 = req.cylinder.p0;
+  // Vector3f l = req.cylinder.l;
+  // float r = req.cylinder.r;
 
-  if(r > 0.4 and r<0.8){
-    if((p0 - screenP0).dot(l) == 0){
-      return true;
-    }
-  }
+  // if(r > 0.4 and r<0.8){
+  //   if((p0 - screenP0).dot(l) == 0){
+  //     return true;
+  //   }
+  // }
 
-  return false;
+  // return false;
 }
 
 bool displayScreen(const vector<struct cylinder>){
@@ -143,6 +143,8 @@ bool GetCylinderFilteredPointCloud(const sensor_msgs::Image& depth_image,
     Vector3f randomD1 = point_cloud[D1];
     Vector3f randomD2 = point_cloud[D2];
 
+    // TODO: Finish Fast Sampling plane Filtering
+
     // cout<<"The size of point cloud is " << point_cloud_size <<endl;
 
     i++; 
@@ -152,9 +154,34 @@ bool GetCylinderFilteredPointCloud(const sensor_msgs::Image& depth_image,
   return true; 
 }
 
+void FitMinimalCylindericalModel(const Vector3f& P1,
+                         const Vector3f& P2,
+                         const Vector3f& P3,
+                         const Vector3f& P4,
+                         const Vector3f& P5
+                         ){
+
+}
+
+void RANSAC(vector<Vector3f> point_cloud){
+  // TODO: Added return value or side effect
+  int point_cloud_size = point_cloud.size(); 
+
+  // Vector3f random1 = point_cloud[rand() % point_cloud_size];
+  // Vector3f random2 = point_cloud[rand() % point_cloud_size];
+  // Vector3f random3 = point_cloud[rand() % point_cloud_size];
+  // Vector3f random4 = point_cloud[rand() % point_cloud_size];
+  // Vector3f random5 = point_cloud[rand() % point_cloud_size];
+
+}
+
 void DepthImageCallback(const sensor_msgs::Image& depth_image){
 	vector<Vector3f> temp_point_cloud;
 	int count = 10;
+  
+  // Setting random seed
+  srand(time(NULL)); 
+
   	for (unsigned int y = 0; y < depth_image.height; ++y) {
     for (unsigned int x = 0; x < depth_image.width; ++x) {
       // Add code here to only process only every nth pixel
@@ -212,9 +239,6 @@ void DepthImageCallback(const sensor_msgs::Image& depth_image){
 int main(int argc, char **argv) {
   ros::init(argc, argv, "compsci403_final");
   ros::NodeHandle n;
-
-    // Setting random seed
-  srand(time(NULL)); 
 
   kinectT << 0.0, 0.0, screenHight/2;
   kinectTheta = PI/4;//45 degrees
