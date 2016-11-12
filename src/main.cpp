@@ -102,6 +102,38 @@ bool checkCylinder(const struct cylinder){//given a struct cylinder
 bool displayScreen(const vector<struct cylinder>){
   //make a point cloud and display the screen
   //screenPublisher.publish();
+
+  //screenpublisher needs to publish a point cloud of the screen
+  vector<Vector3f> point_cloud; //y is zero while x is the width and z is the height
+  const float left = -(screenWidth/2); //relative to kinect position
+  const float right = screenWidth/2;
+  for(size_t top = left; top<right; ++top){
+    //for height = screenhight
+    Vector3f point(top,0,screenHight);
+    point_cloud.push_back(point_cloud);
+  }
+  for(size_t bottom = left; bottom<right; ++bottom){
+    //for height = 0
+    Vector3f point(bottom,0,0);
+    point_cloud.push_back(point_cloud);
+  }
+  for(size_t height = 0; height<screenHeight; ++height){
+    //for left side where point is left
+    Vector3f leftpoint(left,0,height);
+    point_cloud.push_back(point_cloud);
+    //for right side where point is right
+    Vector3f rightpoint(right,0,height);
+    point_cloud.push_back(point_cloud);
+  }
+
+  sensor_msgs::PointCloud point_cloud_msg;
+  point_cloud_msg.header = Header();
+  point_cloud_msg.points.resize(point_cloud.size());
+  for (size_t i = 0; i < point_cloud.size(); ++i) {
+    point_cloud_msg.points[i] = ConvertVectorToPoint(point_cloud[i]);
+  }
+  ROS_INFO("screenPublisher called");
+  screenPublisher.publish(point_cloud_msg);
   return true;
 }
 
@@ -233,8 +265,12 @@ void DepthImageCallback(const sensor_msgs::Image& depth_image){
 
 }
 
-
-
+/*
+void ScreenPublisherCallback(){
+  point_cloud_msg = displayScreen();
+  ROS_INFO("screenPublisher called");
+  screenPublisher.publish(point_cloud_msg);
+}*/
 
 int main(int argc, char **argv) {
   ros::init(argc, argv, "compsci403_final");
@@ -251,8 +287,11 @@ int main(int argc, char **argv) {
       n.advertise<sensor_msgs::PointCloud>("kinect_PointCloud", 1);
   screenPublisher = 
       n.advertise<sensor_msgs::PointCloud>("screen_PointCloud", 1);
+
   /*markerPublisher = 
       n.advertise<sensor_msgs::PointCloud>("arm_marker", 1);*/
+  markerPublisher = 
+      n.advertise<visualization_msgs::Marker>("arm_marker", 1);
 
   ros::Subscriber depth_image_subscriber =
       n.subscribe("/Cobot/Kinect/Depth", 1, DepthImageCallback);
