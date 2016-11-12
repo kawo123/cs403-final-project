@@ -14,6 +14,7 @@
 #include <sensor_msgs/Image.h>
 #include <geometry_msgs/Twist.h>
 #include <nav_msgs/Odometry.h>
+#include <visualization_msgs/Marker.h>
 
 #define PI 3.14159265 //M_PI
 
@@ -39,7 +40,7 @@ const float b = -0.002745;
 const Vector3f screenP0(0, 0, 0); // The screen is at the origin the kinect position should be relitive to the screen
 const Vector3f screenN(1, 0, 0);
 const float screenWidth = 1.5;
-const float screenHight = 1.5;
+const float screenHeight = 1.5;
 
 Vector3f kinectT;
 float kinectTheta;
@@ -86,9 +87,9 @@ bool checkCylinder(const struct cylinder){//given a struct cylinder
 	//if yes, return true
 	//if not return false
 
-  // Vector3f p0 = req.cylinder.p0;
-  // Vector3f l = req.cylinder.l;
-  // float r = req.cylinder.r;
+  // Vector3f p0 = cylinder.p0;
+  // Vector3f l = cylinder.l;
+  // float r = cylinder.r;
 
   // if(r > 0.4 and r<0.8){
   //   if((p0 - screenP0).dot(l) == 0){
@@ -99,6 +100,33 @@ bool checkCylinder(const struct cylinder){//given a struct cylinder
   // return false;
 }
 
+/*bool displayCylinder(const struct cylinder){
+  uint32_t shape = visualization_msgs::Marker::CYLINDER;
+  visualization_msgs::Marker marker;
+  marker.header.frame_id = "/arm";
+  marker.header.stamp = ros::Time::now();
+  marker.ns = "basic_shapes";
+  marker.id = 0;
+  marker.type = shape;
+  marker.action = visualization_msgs::Marker::ADD;
+  marker.pose.position.x = 0;
+  marker.pose.position.y = 0;
+  marker.pose.position.z = 0;
+  marker.pose.orientation.x = 0.0;
+  marker.pose.orientation.y = 0.0;
+  marker.pose.orientation.z = 0.0;
+  marker.pose.orientation.w = 1.0;
+  marker.scale.x = (cylinder.r) * 2; //diameter in x direction
+  marker.scale.y = (cylinder.r) * 2; //diameter in y direction
+  marker.scale.z = cylinder.l.norm(); //specifies height which is the length of l? (is l supposed to be vector normal to p0 which has length of l?)
+  marker.color.r = 0.0f;
+  marker.color.g = 1.0f;
+  marker.color.b = 0.0f;
+  marker.color.a = 1.0;
+  marker.lifetime = ros::Duration();
+  markerPublisher.publish(marker);
+}*/
+
 bool displayScreen(const vector<struct cylinder>){
   //make a point cloud and display the screen
   //screenPublisher.publish();
@@ -108,26 +136,26 @@ bool displayScreen(const vector<struct cylinder>){
   const float left = -(screenWidth/2); //relative to kinect position
   const float right = screenWidth/2;
   for(size_t top = left; top<right; ++top){
-    //for height = screenhight
-    Vector3f point(top,0,screenHight);
-    point_cloud.push_back(point_cloud);
+    //for height = screenheight
+    Vector3f point(top,0,screenHeight);
+    point_cloud.push_back(point);
   }
   for(size_t bottom = left; bottom<right; ++bottom){
     //for height = 0
     Vector3f point(bottom,0,0);
-    point_cloud.push_back(point_cloud);
+    point_cloud.push_back(point);
   }
   for(size_t height = 0; height<screenHeight; ++height){
     //for left side where point is left
     Vector3f leftpoint(left,0,height);
-    point_cloud.push_back(point_cloud);
+    point_cloud.push_back(leftpoint);
     //for right side where point is right
     Vector3f rightpoint(right,0,height);
-    point_cloud.push_back(point_cloud);
+    point_cloud.push_back(rightpoint);
   }
 
   sensor_msgs::PointCloud point_cloud_msg;
-  point_cloud_msg.header = Header();
+  //point_cloud_msg.header = Header();
   point_cloud_msg.points.resize(point_cloud.size());
   for (size_t i = 0; i < point_cloud.size(); ++i) {
     point_cloud_msg.points[i] = ConvertVectorToPoint(point_cloud[i]);
@@ -265,18 +293,14 @@ void DepthImageCallback(const sensor_msgs::Image& depth_image){
 
 }
 
-/*
-void ScreenPublisherCallback(){
-  point_cloud_msg = displayScreen();
-  ROS_INFO("screenPublisher called");
-  screenPublisher.publish(point_cloud_msg);
-}*/
+
+
 
 int main(int argc, char **argv) {
   ros::init(argc, argv, "compsci403_final");
   ros::NodeHandle n;
 
-  kinectT << 0.0, 0.0, screenHight/2;
+  kinectT << 0.0, 0.0, screenHeight/2;
   kinectTheta = PI/4;//45 degrees
   kinectR.row(0) << cos(kinectTheta), 0, sin(kinectTheta);//turn down about y axis
   kinectR.row(1) <<         0,        1,        0;
@@ -290,8 +314,9 @@ int main(int argc, char **argv) {
 
   /*markerPublisher = 
       n.advertise<sensor_msgs::PointCloud>("arm_marker", 1);*/
-  markerPublisher = 
-      n.advertise<visualization_msgs::Marker>("arm_marker", 1);
+  /*markerPublisher = 
+      n.advertise<visualization_msgs::Marker>("arm_marker", 1);*/
+  
 
   ros::Subscriber depth_image_subscriber =
       n.subscribe("/Cobot/Kinect/Depth", 1, DepthImageCallback);
