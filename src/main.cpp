@@ -56,6 +56,7 @@ struct cylinder
 ros::Publisher PointCloudPublisher;
 ros::Publisher screenPublisher;
 ros::Publisher markerPublisher;
+ros::Publisher ransacPublisher;
 
 // Helper function to convert ROS Point32 to Eigen Vectors.
 Vector3f ConvertPointToVector(const Point32& point) {
@@ -79,6 +80,15 @@ float FindVectorMaginitude(const Vector2f V){
 // Helper function to find the magnitude of x and y
 float FindVectorMaginitude(const float x, const float y){
   return (sqrt(pow(x, 2)+pow(y, 2))); 
+}
+
+// Calculating distance between two vectors
+float CalculateDistance(const Vector3f P1, Vector3f P2){
+  float diffX = P1.x() - P2.x();
+  float diffY = P1.y() - P2.y();
+  float diffZ = P1.z() - P2.z();
+
+  return sqrt(pow(diffX, 2) + pow(diffY, 2) + pow(diffZ, 2));
 }
 
 bool checkCylinder(const struct cylinder){//given a struct cylinder
@@ -223,15 +233,63 @@ void FitMinimalCylindericalModel(const Vector3f& P1,
 
 }
 
-void RANSAC(vector<Vector3f> point_cloud){
+void FitMinimalPlane(const Vector3f& avg,
+                     const Vector3f& P2,
+                     const Vector3f& P3,
+                     Vector3f* n,
+                     Vector3f* P0) {
+  *P0 = avg;
+  const Vector3f P21 = P2 - avg;
+  const Vector3f P31 = P3 - avg;
+  *n = (P21.cross(P31)).normalized();
+}
+
+void FindInliers(const Vector3f& n,
+                 const Vector3f& P0,
+                 float radius, 
+                 float epsilon,
+                 const vector<Vector3f>& point_cloud,
+                 vector<Vector3f>* inliers) {
+  inliers->clear();
+  n.normalized(); 
+  for (size_t i = 0; i < point_cloud.size(); ++i) {
+    float projection = abs((point_cloud[i] - P0).dot(n)); 
+    float theta = acos(projection / point_cloud[i].norm()); 
+    float dist = sin(theta) * point_cloud[i].norm(); 
+    // printf("In FindInliers: The distance is %f\n", dist);
+    if (fabs(dist - radius) < epsilon) {
+      inliers->push_back(point_cloud[i]);
+    }
+  }
+}
+
+void RANSAC(vector<Vector3f> point_cloud, vector<Vector3f>* filtered_point_cloud){
   // TODO: Added return value or side effect
   int point_cloud_size = point_cloud.size(); 
 
-  // Vector3f random1 = point_cloud[rand() % point_cloud_size];
-  // Vector3f random2 = point_cloud[rand() % point_cloud_size];
-  // Vector3f random3 = point_cloud[rand() % point_cloud_size];
-  // Vector3f random4 = point_cloud[rand() % point_cloud_size];
-  // Vector3f random5 = point_cloud[rand() % point_cloud_size];
+  Vector3f n; 
+  Vector3f P0; 
+  vector<Vector3f> inliers; 
+  float dist_epsilon = 2; 
+  float inlier_fraction = 0.0; 
+  float min_inlier_fraction = 0.3; 
+  
+  do{
+    Vector3f P1 = point_cloud[rand() % point_cloud_size];
+    Vector3f P2 = point_cloud[rand() % point_cloud_size];
+    Vector3f P3 = point_cloud[rand() % point_cloud_size];
+    Vector3f avg = (P1 + P2 + P3) / 3; 
+    float r = (CalculateDistance(P1, avg) + CalculateDistance(P2, avg) + CalculateDistance(P3, avg))/3; 
+    // Vector3f random4 = point_cloud[rand() % point_cloud_size];
+    // Vector3f random5 = point_cloud[rand() % point_cloud_size];
+    FitMinimalPlane(avg, P2, P3, &n, &P0);
+    FindInliers(n, P0, r, dist_epsilon, point_cloud, &inliers);
+
+    inlier_fraction = static_cast<float>(inliers.size()) / static_cast<float>(point_cloud.size());
+    printf("In RANSAC: the inlier_fraction is %f\n", inlier_fraction);
+  }while(inlier_fraction < min_inlier_fraction);
+
+  *filtered_point_cloud = inliers; 
 
 }
 
@@ -274,22 +332,32 @@ void DepthImageCallback(const sensor_msgs::Image& depth_image){
 	  point_cloud.push_back(P);
   }
 	  
+  //ransac for cylinders
+  vector<Vector3f> filtered_point_cloud; 
+  // GetCylinderFilteredPointCloud(depth_image, point_cloud, filtered_point_cloud);
+  // RANSAC(point_cloud, &filtered_point_cloud); 
+  // cout << filtered_point_cloud[0] << std::endl;
 
+  //use checkCylinder and getBestCylinder
+
+  // Publshing point cloud
 	sensor_msgs::PointCloud point_cloud_msg;
 	point_cloud_msg.header = depth_image.header;
 	point_cloud_msg.points.resize(point_cloud.size());
 	for (size_t i = 0; i < point_cloud.size(); ++i) {
 	  point_cloud_msg.points[i] = ConvertVectorToPoint(point_cloud[i]);
 	}
-
   PointCloudPublisher.publish(point_cloud_msg);
   ROS_INFO("DepthImageCallback called");
 
-  //ransac for cylinders
-  vector<Vector3f> filtered_point_cloud; 
-  GetCylinderFilteredPointCloud(depth_image, point_cloud, filtered_point_cloud);
-
-  //use checkCylinder and getBestCylinder
+  // publishing filtered point cloud
+  sensor_msgs::PointCloud filtered_point_cloud_msg;
+  filtered_point_cloud_msg.header = depth_image.header;
+  filtered_point_cloud_msg.points.resize(filtered_point_cloud.size());
+  for (size_t i = 0; i < filtered_point_cloud.size(); ++i) {
+    filtered_point_cloud_msg.points[i] = ConvertVectorToPoint(filtered_point_cloud[i]);
+  }
+  ransacPublisher.publish(filtered_point_cloud_msg);
 
 }
 
@@ -311,6 +379,8 @@ int main(int argc, char **argv) {
       n.advertise<sensor_msgs::PointCloud>("kinect_PointCloud", 1);
   screenPublisher = 
       n.advertise<sensor_msgs::PointCloud>("screen_PointCloud", 1);
+  ransacPublisher = 
+      n.advertise<sensor_msgs::PointCloud>("ransac_filtered_point_cloud", 1);
 
   /*markerPublisher = 
       n.advertise<sensor_msgs::PointCloud>("arm_marker", 1);*/
