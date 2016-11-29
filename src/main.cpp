@@ -36,6 +36,9 @@ const float f_y = -564.227;
 const float a = 3.008;
 const float b = -0.002745;
 
+const float Kinect_min_range = 0.8;
+const float Kinect_max_range = 10;
+
 //projector screen plane
 const Vector3f screenP0(0, 0, 0); // The screen is at the origin the kinect position should be relitive to the screen
 const Vector3f screenN(1, 0, 0);
@@ -292,9 +295,9 @@ void RANSAC(vector<Vector3f> point_cloud, vector<Vector3f>* filtered_point_cloud
   Vector3f n; 
   Vector3f P0; 
   vector<Vector3f> inliers; 
-  float dist_epsilon = 0.5; 
+  float dist_epsilon = 0.05;//0.5; 
   float inlier_fraction = 0.0; 
-  float min_inlier_fraction = 0.20; 
+  float min_inlier_fraction = 0.05;//0.20; 
   
   // RANSAC for cylinder
   // do{
@@ -363,8 +366,11 @@ void DepthImageCallback(const sensor_msgs::Image& depth_image){
 	vector<Vector3f> point_cloud;
 	for (size_t i = 0; i < temp_point_cloud.size(); ++i){
 	  Vector3f P(temp_point_cloud[i].z(), -temp_point_cloud[i].x(), temp_point_cloud[i].y());
-    //P = kinectR*P + kinectT; //rotate the kinect inage
-	  point_cloud.push_back(P);
+	  float P_range = sqrt(P.x()*P.x() + P.y()*P.y());
+	  if (P_range < Kinect_max_range && P_range > Kinect_min_range){
+	  	//P = kinectR*P + kinectT; //rotate the kinect inage
+	    point_cloud.push_back(P);
+	  }
   }
 	  
   //ransac for cylinders
