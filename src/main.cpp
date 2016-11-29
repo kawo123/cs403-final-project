@@ -209,9 +209,9 @@ bool GetCylinderFilteredPointCloud(const sensor_msgs::Image& depth_image,
       D2 = D0 + (rand() % neightborhood_size + 1) - deviation;
     } 
     
-    Vector3f randomD0 = point_cloud[D0];
-    Vector3f randomD1 = point_cloud[D1];
-    Vector3f randomD2 = point_cloud[D2];
+    // Vector3f randomD0 = point_cloud[D0];
+    // Vector3f randomD1 = point_cloud[D1];
+    // Vector3f randomD2 = point_cloud[D2];
 
     // TODO: Finish Fast Sampling plane Filtering
 
@@ -244,21 +244,43 @@ void FitMinimalPlane(const Vector3f& avg,
   *n = (P21.cross(P31)).normalized();
 }
 
-void FindInliers(const Vector3f& n,
-                 const Vector3f& P0,
-                 float radius, 
+// void FindInliers(const Vector3f& n,
+//                  const Vector3f& P0,
+//                  float radius, 
+//                  float epsilon,
+//                  const vector<Vector3f>& point_cloud,
+//                  vector<Vector3f>* inliers) {
+//   inliers->clear();
+//   n.normalized(); 
+//   for (size_t i = 0; i < point_cloud.size(); ++i) {
+//     float projection = abs((point_cloud[i] - P0).dot(n)); 
+//     float theta = acos(projection / point_cloud[i].norm()); 
+//     float dist = sin(theta) * point_cloud[i].norm(); 
+//     // printf("In FindInliers: The distance is %f\n", dist);
+//     if (fabs(dist - radius) < epsilon) {
+//       inliers->push_back(point_cloud[i]);
+//     }
+//   }
+// }
+
+void FindInliers(Vector3f P,
+                 Vector3f Q,
                  float epsilon,
                  const vector<Vector3f>& point_cloud,
                  vector<Vector3f>* inliers) {
   inliers->clear();
-  n.normalized(); 
+  // v.normalized(); 
+  Vector3f AP; 
+  Vector3f PQ; 
+  Vector3f A; 
   for (size_t i = 0; i < point_cloud.size(); ++i) {
-    float projection = abs((point_cloud[i] - P0).dot(n)); 
-    float theta = acos(projection / point_cloud[i].norm()); 
-    float dist = sin(theta) * point_cloud[i].norm(); 
-    // printf("In FindInliers: The distance is %f\n", dist);
-    if (fabs(dist - radius) < epsilon) {
-      inliers->push_back(point_cloud[i]);
+    A = point_cloud[i]; 
+    AP = P - A; 
+    PQ = Q - P; 
+    Vector3f projection = (AP.dot(PQ) / pow(PQ.norm(), 2)) * PQ; 
+    float distance = CalculateDistance(AP, projection);
+    if(fabs(distance) < epsilon){
+      inliers->push_back(A);
     }
   }
 }
@@ -270,20 +292,33 @@ void RANSAC(vector<Vector3f> point_cloud, vector<Vector3f>* filtered_point_cloud
   Vector3f n; 
   Vector3f P0; 
   vector<Vector3f> inliers; 
-  float dist_epsilon = 2; 
+  float dist_epsilon = 0.5; 
   float inlier_fraction = 0.0; 
-  float min_inlier_fraction = 0.3; 
+  float min_inlier_fraction = 0.20; 
   
+  // RANSAC for cylinder
+  // do{
+  //   Vector3f P1 = point_cloud[rand() % point_cloud_size];
+  //   Vector3f P2 = point_cloud[rand() % point_cloud_size];
+  //   Vector3f P3 = point_cloud[rand() % point_cloud_size];
+  //   Vector3f avg = (P1 + P2 + P3) / 3; 
+  //   float r = (CalculateDistance(P1, avg) + CalculateDistance(P2, avg) + CalculateDistance(P3, avg))/3; 
+  //   FitMinimalPlane(avg, P2, P3, &n, &P0);
+  //   FindInliers(n, P0, r, dist_epsilon, point_cloud, &inliers);
+
+  //   inlier_fraction = static_cast<float>(inliers.size()) / static_cast<float>(point_cloud.size());
+  //   printf("In RANSAC: the inlier_fraction is %f\n", inlier_fraction);
+  // }while(inlier_fraction < min_inlier_fraction);
+
+  // *filtered_point_cloud = inliers; 
+
+
+  // RANSAC for line
   do{
     Vector3f P1 = point_cloud[rand() % point_cloud_size];
     Vector3f P2 = point_cloud[rand() % point_cloud_size];
-    Vector3f P3 = point_cloud[rand() % point_cloud_size];
-    Vector3f avg = (P1 + P2 + P3) / 3; 
-    float r = (CalculateDistance(P1, avg) + CalculateDistance(P2, avg) + CalculateDistance(P3, avg))/3; 
-    // Vector3f random4 = point_cloud[rand() % point_cloud_size];
-    // Vector3f random5 = point_cloud[rand() % point_cloud_size];
-    FitMinimalPlane(avg, P2, P3, &n, &P0);
-    FindInliers(n, P0, r, dist_epsilon, point_cloud, &inliers);
+    // Vector3f P1P2 = P2 - P1; 
+    FindInliers(P1, P2, dist_epsilon, point_cloud, &inliers);
 
     inlier_fraction = static_cast<float>(inliers.size()) / static_cast<float>(point_cloud.size());
     printf("In RANSAC: the inlier_fraction is %f\n", inlier_fraction);
@@ -335,7 +370,7 @@ void DepthImageCallback(const sensor_msgs::Image& depth_image){
   //ransac for cylinders
   vector<Vector3f> filtered_point_cloud; 
   // GetCylinderFilteredPointCloud(depth_image, point_cloud, filtered_point_cloud);
-  // RANSAC(point_cloud, &filtered_point_cloud); 
+  RANSAC(point_cloud, &filtered_point_cloud); 
   // cout << filtered_point_cloud[0] << std::endl;
 
   //use checkCylinder and getBestCylinder
