@@ -56,10 +56,17 @@ struct cylinder
   float r;
 };
 
+struct line
+{
+  Vector3f p0;
+  Vector3f l;
+};
+
 ros::Publisher PointCloudPublisher;
 ros::Publisher screenPublisher;
 ros::Publisher markerPublisher;
 ros::Publisher ransacPublisher;
+ros::Publisher windowPublisher;
 
 // Helper function to convert ROS Point32 to Eigen Vectors.
 Vector3f ConvertPointToVector(const Point32& point) {
@@ -111,6 +118,20 @@ bool checkCylinder(const struct cylinder){//given a struct cylinder
   // }
 
   // return false;
+  return true;
+}
+
+// helper method for checkLine, given a line it 
+// finds where the line intersects with the screen's plane
+Vector3f line_to_plane_intersection(const struct line){
+  Vector3f p;
+  return p;
+}
+
+// checks if the given line intersects with the screen's plane
+// returns true if it is valid and false otherwize
+bool checkLine(const struct line){
+  return 0;
 }
 
 /*bool displayCylinder(const struct cylinder){
@@ -140,12 +161,15 @@ bool checkCylinder(const struct cylinder){//given a struct cylinder
   markerPublisher.publish(marker);
 }*/
 
-bool displayScreen(const vector<struct cylinder>){
+// Uses a marker array to display the bounding lines 
+// of the screen and the dots on the screen 
+// corisponding to the laser pointers
+bool displayScreen(const vector<Vector3f>){
   //make a point cloud and display the screen
   //screenPublisher.publish();
 
   //screenpublisher needs to publish a point cloud of the screen
-  vector<Vector3f> point_cloud; //y is zero while x is the width and z is the height
+  /*vector<Vector3f> point_cloud; //y is zero while x is the width and z is the height
   const float left = -(screenWidth/2); //relative to kinect position
   const float right = screenWidth/2;
   for(size_t top = left; top<right; ++top){
@@ -174,7 +198,12 @@ bool displayScreen(const vector<struct cylinder>){
     point_cloud_msg.points[i] = ConvertVectorToPoint(point_cloud[i]);
   }
   ROS_INFO("screenPublisher called");
-  screenPublisher.publish(point_cloud_msg);
+  screenPublisher.publish(point_cloud_msg);*/
+  return true;
+}
+
+// Using a marker array this displays the lasers
+bool displayLines(const vector<struct line> lines){
   return true;
 }
 
@@ -331,35 +360,98 @@ void RANSAC(vector<Vector3f> point_cloud, vector<Vector3f>* filtered_point_cloud
 
 }
 
+vector<Vector3f> getWindow(const vector<Vector3f> point_cloud, 
+						   const Vector3f p, 
+						   const float window_size){
+  vector<Vector3f> window;
+  const float w = window_size/2;
+  const float Xmax = p.x() + w;
+  const float Xmin = p.x() - w;
+  const float Ymax = p.y() + w;
+  const float Ymin = p.y() - w;
+  const float Zmax = p.z() + w;
+  const float Zmin = p.z() - w;
+  for (size_t i = 0; i < point_cloud.size(); ++i){
+  	if (point_cloud[i].x() > Xmin && point_cloud[i].x() < Xmax 
+  		&& point_cloud[i].y() > Ymin && point_cloud[i].y() < Ymax
+  		&& point_cloud[i].z() > Zmin && point_cloud[i].z() < Zmax){
+  	  window.push_back(point_cloud[i]);
+  	}
+  }
+  return window;
+}
+
+void FSLF(vector<Vector3f> point_cloud, vector< vector<Vector3f> >* filtered_point_clouds){ 
+  vector< vector<Vector3f> > inlier_point_clouds;
+  //vector<Vector3f> inliers; 
+  float dist_epsilon = 0.04;//0.5; 
+  float inlier_fraction = 0.0; 
+  float min_inlier_fraction = 0.35;//0.20; 
+  float window_size = 1;
+
+  unsigned int n = 5;
+  unsigned int k = 100;
+
+  unsigned int i = 0;
+  do{
+    Vector3f P1 = point_cloud[rand() % point_cloud.size()];
+    vector<Vector3f> point_cloud_window = getWindow(point_cloud, P1, window_size);
+    Vector3f P2 = point_cloud_window[rand() % point_cloud_window.size()];//check is valid
+    /*line newLine;
+    newLine.p0 = P1;
+    do {
+      P2 = point_cloud_window[rand() % point_cloud_window.size()];
+      newLine.l = P2 - P1;
+      newLine.l = newLine.l/newLine.l.norm();
+    }while(checkLine(newLine) != 0);//should also chep if it is relativly close*/
+
+    vector<Vector3f> inliers;
+    FindInliers(P1, P2, dist_epsilon, point_cloud_window, &inliers);//change to accept a line
+
+    inlier_fraction = static_cast<float>(inliers.size()) / static_cast<float>(point_cloud_window.size());
+    printf("In RANSAC: the inlier_fraction is %f\n", inlier_fraction);
+    //temp
+    if (inlier_fraction > min_inlier_fraction){
+      inlier_point_clouds.push_back(inliers);
+      if (inlier_point_clouds.size() > n - 1){
+      	break;
+      }
+    }
+    ++k;
+  }while(i < k);
+
+  *filtered_point_clouds = inlier_point_clouds; 
+}
+
 void DepthImageCallback(const sensor_msgs::Image& depth_image){
 	vector<Vector3f> temp_point_cloud;
 	int count = 10;
   
-  // Setting random seed
-  srand(time(NULL)); 
+    // Setting random seed
+    srand(time(NULL)); 
 
   	for (unsigned int y = 0; y < depth_image.height; ++y) {
-    for (unsigned int x = 0; x < depth_image.width; ++x) {
-      // Add code here to only process only every nth pixel
-      if(count <= 0){
-        uint16_t byte0 = depth_image.data[2 * (x + y * depth_image.width) + 0];
-        uint16_t byte1 = depth_image.data[2 * (x + y * depth_image.width) + 1];
-        if (!depth_image.is_bigendian) {
-          std::swap(byte0, byte1);
-        }
-        // Combine the two bytes to form a 16 bit value, and disregard the
-        // most significant 4 bits to extract the lowest 12 bits.
-        const uint16_t raw_depth = ((byte0 << 8) | byte1) & 0x7FF;
-        // Reconstruct 3D point from x, y, raw_depth using the camera intrinsics and add it to your point cloud.
-       float depth = 1/ (a + (b*raw_depth));
+      for (unsigned int x = 0; x < depth_image.width; ++x) {
+      	// Add code here to only process only every nth pixel
+      	if(count <= 0){
+          uint16_t byte0 = depth_image.data[2 * (x + y * depth_image.width) + 0];
+          uint16_t byte1 = depth_image.data[2 * (x + y * depth_image.width) + 1];
+          if (!depth_image.is_bigendian) {
+            std::swap(byte0, byte1);
+          }
+          // Combine the two bytes to form a 16 bit value, and disregard the
+          // most significant 4 bits to extract the lowest 12 bits.
+          const uint16_t raw_depth = ((byte0 << 8) | byte1) & 0x7FF;
+          // Reconstruct 3D point from x, y, raw_depth using the camera intrinsics and add it to your point cloud.
+          float depth = 1/ (a + (b*raw_depth));
 
-        Vector3f point(depth * ((x - p_x)/f_x),  depth * ((y - p_y)/f_y), depth);
-        temp_point_cloud.push_back(point);
-        count = 10;
+          Vector3f point(depth * ((x - p_x)/f_x),  depth * ((y - p_y)/f_y), depth);
+          temp_point_cloud.push_back(point);
+          count = 10;
     	} else {
-      		count--;
+      	  count--;
     	}
-   	} 
+   	  } 
 	}
 
 
@@ -368,15 +460,19 @@ void DepthImageCallback(const sensor_msgs::Image& depth_image){
 	  Vector3f P(temp_point_cloud[i].z(), -temp_point_cloud[i].x(), temp_point_cloud[i].y());
 	  float P_range = sqrt(P.x()*P.x() + P.y()*P.y());
 	  if (P_range < Kinect_max_range && P_range > Kinect_min_range){
-	  	//P = kinectR*P + kinectT; //rotate the kinect inage
+	  	//P = kinectR*P + kinectT; //rotate the kinect image
 	    point_cloud.push_back(P);
 	  }
   }
 	  
   //ransac for cylinders
-  vector<Vector3f> filtered_point_cloud; 
+  vector< vector<Vector3f> > filtered_point_clouds; 
   // GetCylinderFilteredPointCloud(depth_image, point_cloud, filtered_point_cloud);
-  RANSAC(point_cloud, &filtered_point_cloud); 
+
+  //RANSAC(point_cloud, &filtered_point_cloud);
+  FSLF(point_cloud, &filtered_point_clouds);
+  //vector<Vector3f> point_cloud_window = FSLF(point_cloud, &filtered_point_cloud);
+
   // cout << filtered_point_cloud[0] << std::endl;
 
   //use checkCylinder and getBestCylinder
@@ -394,11 +490,31 @@ void DepthImageCallback(const sensor_msgs::Image& depth_image){
   // publishing filtered point cloud
   sensor_msgs::PointCloud filtered_point_cloud_msg;
   filtered_point_cloud_msg.header = depth_image.header;
-  filtered_point_cloud_msg.points.resize(filtered_point_cloud.size());
-  for (size_t i = 0; i < filtered_point_cloud.size(); ++i) {
-    filtered_point_cloud_msg.points[i] = ConvertVectorToPoint(filtered_point_cloud[i]);
+
+  size_t size = 0;
+  for (size_t i = 0; i < filtered_point_clouds.size(); ++i){
+  	size += filtered_point_clouds[i].size();
+  }
+
+  filtered_point_cloud_msg.points.resize(size);
+
+  size_t iter = 0;
+  for (size_t i = 0; i < filtered_point_clouds.size(); ++i) {
+  	for (size_t j = 0; j < filtered_point_clouds[i].size(); ++j){
+  	  filtered_point_cloud_msg.points[iter] = ConvertVectorToPoint(filtered_point_clouds[i][j]);
+  	  ++iter;
+  	}
   }
   ransacPublisher.publish(filtered_point_cloud_msg);
+
+  // Publishing window
+  /*sensor_msgs::PointCloud point_cloud_window_msg;
+  point_cloud_window_msg.header = depth_image.header;
+  point_cloud_window_msg.points.resize(point_cloud_window.size());
+  for (size_t i = 0; i < point_cloud_window.size(); ++i) {
+    point_cloud_window_msg.points[i] = ConvertVectorToPoint(point_cloud_window[i]);
+  }
+  windowPublisher.publish(point_cloud_window_msg);*/
 
 }
 
@@ -422,6 +538,8 @@ int main(int argc, char **argv) {
       n.advertise<sensor_msgs::PointCloud>("screen_PointCloud", 1);
   ransacPublisher = 
       n.advertise<sensor_msgs::PointCloud>("ransac_filtered_point_cloud", 1);
+  windowPublisher = 
+      n.advertise<sensor_msgs::PointCloud>("window_point_cloud", 1);
 
   /*markerPublisher = 
       n.advertise<sensor_msgs::PointCloud>("arm_marker", 1);*/
