@@ -7,7 +7,7 @@
 #include <limits>
 
 #include <eigen3/Eigen/Dense>
-#include <geometry_msgs/Point32.h>
+#include <geometry_msgs/Point.h>
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/PointCloud.h>
 #include <sensor_msgs/ChannelFloat32.h>
@@ -20,7 +20,7 @@
 using Eigen::Matrix3f;
 using Eigen::Vector3f;
 using Eigen::Vector2f;
-using geometry_msgs::Point32;
+using geometry_msgs::Point;
 using std::fabs;
 using std::max;
 using std::atan2;
@@ -64,6 +64,20 @@ struct line
   Vector3f p0;
   Vector3f l;
 };
+
+
+struct Line{ //this is Line struct for displaying the screen only
+  Vector3f p1;
+  Vector3f p2; 
+
+  Line(Vector3f x, Vector3f y){
+    p1 = x; 
+    p2 = y; 
+  }
+}; 
+vector<Line> map; 
+
+
 
 vector<struct line> last_found_lines;
 
@@ -115,50 +129,50 @@ void InitMarkers() {
 }
 
 // Helper function to convert ROS Point32 to Eigen Vectors.
-Vector3f ConvertPointToVector(const Point32& point) {
+Vector3f ConvertPointToVector(const Point& point) {
   return Vector3f(point.x, point.y, point.z);
 }
 
 // Helper function to convert Eigen Vectors to ROS Point32.
-Point32 ConvertVectorToPoint(const Vector3f& vector) {
-  Point32 point;
+Point ConvertVectorToPoint(const Vector3f& vector) {
+  Point point;
   point.x = vector.x();
   point.y = vector.y();
   point.z = vector.z();
   return point;
 }
 
-/*// Helper function to visualize a point.
-void DrawPoint(const Vector2f& p, Marker* marker) {
+// Helper function to visualize a point.
+void DrawPoint(const Vector3f& p, Marker* marker) {
   marker->points.push_back(ConvertVectorToPoint(p));
 }
 
 // Helper function to visualize an edge.
-void DrawLine(const Vector2f& p1,
-              const Vector2f& p2,
+void DrawLine(const Vector3f& p1,
+              const Vector3f& p2,
               Marker* marker) {
   marker->points.push_back(ConvertVectorToPoint(p1));
   marker->points.push_back(ConvertVectorToPoint(p2));
-}*/
+}
 
 // Helper function to find the magnitude of Vector2f
-float FindVectorMaginitude(const Vector2f V){
-  return (sqrt(pow(V.x(), 2)+pow(V.y(), 2))); 
-}
+  float FindVectorMaginitude(const Vector2f V){
+    return (sqrt(pow(V.x(), 2)+pow(V.y(), 2))); 
+  }
 
 // Helper function to find the magnitude of x and y
-float FindVectorMaginitude(const float x, const float y){
-  return (sqrt(pow(x, 2)+pow(y, 2))); 
-}
+  float FindVectorMaginitude(const float x, const float y){
+    return (sqrt(pow(x, 2)+pow(y, 2))); 
+  }
 
 // Calculating distance between two vectors
-float CalculateDistance(const Vector3f P1, Vector3f P2){
-  float diffX = P1.x() - P2.x();
-  float diffY = P1.y() - P2.y();
-  float diffZ = P1.z() - P2.z();
+  float CalculateDistance(const Vector3f P1, Vector3f P2){
+    float diffX = P1.x() - P2.x();
+    float diffY = P1.y() - P2.y();
+    float diffZ = P1.z() - P2.z();
 
-  return sqrt(pow(diffX, 2) + pow(diffY, 2) + pow(diffZ, 2));
-}
+    return sqrt(pow(diffX, 2) + pow(diffY, 2) + pow(diffZ, 2));
+  }
 
 bool checkCylinder(const struct cylinder){//given a struct cylinder
 	//for displaying cylinder on rviz, use marker
@@ -196,9 +210,19 @@ bool checkLine(const struct line){
 // Uses a marker array to display the bounding lines 
 // of the screen and the dots on the screen 
 // corisponding to the laser pointers
-bool displayScreen(const vector<Vector3f>, MarkerArray* markers){
+void displayScreen(const vector<Vector3f> laserpointers){//, MarkerArray *markers){
   //(markers*).markers.push_back()
-  return true;
+
+  for(size_t i = 0; i<laserpointers.size(); ++i){
+    DrawPoint(laserpointers[i], &screen_marker);
+  }
+  map.push_back(Line(Vector3f(-1.5, 0, 0), Vector3f(1.5, 0, 0))); 
+  map.push_back(Line(Vector3f(1.5, 0, 0), Vector3f(-1.5, 0, 0))); 
+  map.push_back(Line(Vector3f(-1.5, 0, 0), Vector3f(-1.5, 0, 0))); 
+  map.push_back(Line(Vector3f(-1.5, 0, 0), Vector3f(1.5, 1.5, 0))); 
+
+
+
 }
 
 // Using a marker array this displays the lasers
@@ -212,8 +236,8 @@ struct cylinder getBestCylinder(vector<Vector3f> filteredPointCloud){
 }
 
 bool GetCylinderFilteredPointCloud(const sensor_msgs::Image& depth_image, 
-                                    vector<Vector3f> point_cloud, 
-                                    vector<Vector3f> filtered_point_cloud){
+  vector<Vector3f> point_cloud, 
+  vector<Vector3f> filtered_point_cloud){
   // user variables
   int max_neighborhoods = 0;
   int neightborhood_size = 100; 
@@ -256,19 +280,19 @@ bool GetCylinderFilteredPointCloud(const sensor_msgs::Image& depth_image,
 }
 
 void FitMinimalCylindericalModel(const Vector3f& P1,
-                         const Vector3f& P2,
-                         const Vector3f& P3,
-                         const Vector3f& P4,
-                         const Vector3f& P5
-                         ){
+ const Vector3f& P2,
+ const Vector3f& P3,
+ const Vector3f& P4,
+ const Vector3f& P5
+ ){
 
 }
 
 void FitMinimalPlane(const Vector3f& avg,
-                     const Vector3f& P2,
-                     const Vector3f& P3,
-                     Vector3f* n,
-                     Vector3f* P0) {
+ const Vector3f& P2,
+ const Vector3f& P3,
+ Vector3f* n,
+ Vector3f* P0) {
   *P0 = avg;
   const Vector3f P21 = P2 - avg;
   const Vector3f P31 = P3 - avg;
@@ -299,9 +323,9 @@ struct line getBestFitLine(vector<Vector3f> point_cloud){
   l.p0(1) = 0;
   l.p0(2) = 0;
   for (size_t i = 0; i < point_cloud.size(); ++i){
-  	 l.p0(0) += point_cloud[i](0);
-  	 l.p0(1) += point_cloud[i](1);
-  	 l.p0(2) += point_cloud[i](2);
+    l.p0(0) += point_cloud[i](0);
+    l.p0(1) += point_cloud[i](1);
+    l.p0(2) += point_cloud[i](2);
   }
   l.p0(0) = l.p0(0)/point_cloud.size();
   l.p0(1) = l.p0(1)/point_cloud.size();
@@ -310,10 +334,10 @@ struct line getBestFitLine(vector<Vector3f> point_cloud){
 }
 
 void FindInliers(Vector3f P,
-                 Vector3f Q,
-                 float epsilon,
-                 const vector<Vector3f>& point_cloud,
-                 vector<Vector3f>* inliers) {
+ Vector3f Q,
+ float epsilon,
+ const vector<Vector3f>& point_cloud,
+ vector<Vector3f>* inliers) {
   inliers->clear();
   // v.normalized(); 
   Vector3f AP; 
@@ -361,7 +385,7 @@ bool RANSAC(vector<Vector3f> point_cloud, vector<Vector3f>* filtered_point_cloud
   for(size_t i = 0; i < 20; ++i) {
     Vector3f P1 = point_cloud[rand() % point_cloud.size()];
     Vector3f P2 = point_cloud[rand() % point_cloud.size()];
-     
+
     vector<Vector3f> new_inliers;
     FindInliers(P1, P2, dist_epsilon, point_cloud, &new_inliers);
 
@@ -381,8 +405,8 @@ bool RANSAC(vector<Vector3f> point_cloud, vector<Vector3f>* filtered_point_cloud
 }
 
 vector<Vector3f> getWindow(const vector<Vector3f> point_cloud, 
-						   const Vector3f p, 
-						   const float window_size){
+ const Vector3f p, 
+ const float window_size){
   vector<Vector3f> window;
   const float w = window_size/2;
   const float Xmax = p.x() + w;
@@ -395,15 +419,15 @@ vector<Vector3f> getWindow(const vector<Vector3f> point_cloud,
   	if (point_cloud[i].x() > Xmin && point_cloud[i].x() < Xmax 
   		&& point_cloud[i].y() > Ymin && point_cloud[i].y() < Ymax
   		&& point_cloud[i].z() > Zmin && point_cloud[i].z() < Zmax){
-  	  window.push_back(point_cloud[i]);
-  	}
-  }
-  return window;
+     window.push_back(point_cloud[i]);
+ }
+}
+return window;
 }
 
 void FSLF(vector<Vector3f> point_cloud, 
-		  vector< vector<Vector3f> >* filtered_point_clouds, 
-		  vector<struct line>* valid_lines){ 
+  vector< vector<Vector3f> >* filtered_point_clouds, 
+  vector<struct line>* valid_lines){ 
   vector< vector<Vector3f> > inlier_point_clouds;
   vector<struct line> lines; 
   float window_size = 0.5;
@@ -431,81 +455,81 @@ void FSLF(vector<Vector3f> point_cloud,
   	vector<Vector3f> point_cloud_window;
   	unsigned int count = 0;
   	do {
-  	  count++;
-      Vector3f p = point_cloud[rand() % point_cloud.size()];
-      point_cloud_window = getWindow(point_cloud, p, window_size);
-      ROS_INFO("point_cloud_window.size(): %d", point_cloud_window.size());
-      if (count > k){
-      	break;
-      }
-	}while(point_cloud_window.size() < minWindowpoints);
+     count++;
+     Vector3f p = point_cloud[rand() % point_cloud.size()];
+     point_cloud_window = getWindow(point_cloud, p, window_size);
+     ROS_INFO("point_cloud_window.size(): %d", point_cloud_window.size());
+     if (count > k){
+       break;
+     }
+   }while(point_cloud_window.size() < minWindowpoints);
 
-    ROS_INFO("starting ransac");
-    vector<Vector3f> filtered_point_cloud;
-    if (RANSAC(point_cloud_window, &filtered_point_cloud)){
-      ROS_INFO("found a line");
-      inlier_point_clouds.push_back(filtered_point_cloud);
-      lines.push_back(getBestFitLine(filtered_point_cloud));
-      if (inlier_point_clouds.size() > n - 1){
-      	break;
-      }
-    }
-    k--;
-  }while(k > 0);
-  *filtered_point_clouds = inlier_point_clouds; 
-  *valid_lines = lines;
+   ROS_INFO("starting ransac");
+   vector<Vector3f> filtered_point_cloud;
+   if (RANSAC(point_cloud_window, &filtered_point_cloud)){
+    ROS_INFO("found a line");
+    inlier_point_clouds.push_back(filtered_point_cloud);
+    lines.push_back(getBestFitLine(filtered_point_cloud));
+    if (inlier_point_clouds.size() > n - 1){
+     break;
+   }
+ }
+ k--;
+}while(k > 0);
+*filtered_point_clouds = inlier_point_clouds; 
+*valid_lines = lines;
 }
 
 void DepthImageCallback(const sensor_msgs::Image& depth_image){
 	vector<Vector3f> temp_point_cloud;
 	int count = 10;
-  
-    // Setting random seed
-    srand(time(NULL)); 
 
-  	for (unsigned int y = 0; y < depth_image.height; ++y) {
-      for (unsigned int x = 0; x < depth_image.width; ++x) {
+    // Setting random seed
+  srand(time(NULL)); 
+
+  for (unsigned int y = 0; y < depth_image.height; ++y) {
+    for (unsigned int x = 0; x < depth_image.width; ++x) {
       	// Add code here to only process only every nth pixel
-      	if(count <= 0){
-          uint16_t byte0 = depth_image.data[2 * (x + y * depth_image.width) + 0];
-          uint16_t byte1 = depth_image.data[2 * (x + y * depth_image.width) + 1];
-          if (!depth_image.is_bigendian) {
-            std::swap(byte0, byte1);
-          }
+     if(count <= 0){
+      uint16_t byte0 = depth_image.data[2 * (x + y * depth_image.width) + 0];
+      uint16_t byte1 = depth_image.data[2 * (x + y * depth_image.width) + 1];
+      if (!depth_image.is_bigendian) {
+        std::swap(byte0, byte1);
+      }
           // Combine the two bytes to form a 16 bit value, and disregard the
           // most significant 4 bits to extract the lowest 12 bits.
-          const uint16_t raw_depth = ((byte0 << 8) | byte1) & 0x7FF;
+      const uint16_t raw_depth = ((byte0 << 8) | byte1) & 0x7FF;
           // Reconstruct 3D point from x, y, raw_depth using the camera intrinsics and add it to your point cloud.
-          float depth = 1/ (a + (b*raw_depth));
+      float depth = 1/ (a + (b*raw_depth));
 
-          Vector3f point(depth * ((x - p_x)/f_x),  depth * ((y - p_y)/f_y), depth);
-          temp_point_cloud.push_back(point);
-          count = 10;
-    	} else {
-      	  count--;
-    	}
-   	  } 
-	}
+      Vector3f point(depth * ((x - p_x)/f_x),  depth * ((y - p_y)/f_y), depth);
+      temp_point_cloud.push_back(point);
+      count = 10;
+    } else {
+     count--;
+   }
+ } 
+}
 
 
-	vector<Vector3f> point_cloud;
-	for (size_t i = 0; i < temp_point_cloud.size(); ++i){
-	  Vector3f P(temp_point_cloud[i].z(), -temp_point_cloud[i].x(), temp_point_cloud[i].y());
-	  float P_range = sqrt(P.x()*P.x() + P.y()*P.y());
-	  if (P_range < Kinect_max_range && P_range > Kinect_min_range){
+vector<Vector3f> point_cloud;
+for (size_t i = 0; i < temp_point_cloud.size(); ++i){
+ Vector3f P(temp_point_cloud[i].z(), -temp_point_cloud[i].x(), temp_point_cloud[i].y());
+ float P_range = sqrt(P.x()*P.x() + P.y()*P.y());
+ if (P_range < Kinect_max_range && P_range > Kinect_min_range){
 	  	//P = kinectR*P + kinectT; //rotate the kinect image
-	    point_cloud.push_back(P);
-	  }
-  }
-	  
+   point_cloud.push_back(P);
+ }
+}
+
   //ransac for cylinders
-  vector< vector<Vector3f> > filtered_point_clouds; 
-  vector<struct line> lines;
+vector< vector<Vector3f> > filtered_point_clouds; 
+vector<struct line> lines;
   // GetCylinderFilteredPointCloud(depth_image, point_cloud, filtered_point_cloud);
 
   //RANSAC(point_cloud, &filtered_point_cloud);
-  FSLF(point_cloud, &filtered_point_clouds, &lines);
-  last_found_lines = lines;
+FSLF(point_cloud, &filtered_point_clouds, &lines);
+last_found_lines = lines;
   //vector<Vector3f> point_cloud_window = FSLF(point_cloud, &filtered_point_cloud);
 
   // cout << filtered_point_cloud[0] << std::endl;
@@ -513,34 +537,34 @@ void DepthImageCallback(const sensor_msgs::Image& depth_image){
   //use checkCylinder and getBestCylinder
 
   // Publshing point cloud
-	sensor_msgs::PointCloud point_cloud_msg;
-	point_cloud_msg.header = depth_image.header;
-	point_cloud_msg.points.resize(point_cloud.size());
-	for (size_t i = 0; i < point_cloud.size(); ++i) {
-	  point_cloud_msg.points[i] = ConvertVectorToPoint(point_cloud[i]);
-	}
-  PointCloudPublisher.publish(point_cloud_msg);
-  ROS_INFO("DepthImageCallback called");
+sensor_msgs::PointCloud point_cloud_msg;
+point_cloud_msg.header = depth_image.header;
+point_cloud_msg.points.resize(point_cloud.size());
+for (size_t i = 0; i < point_cloud.size(); ++i) {
+ point_cloud_msg.points[i] = ConvertVectorToPoint(point_cloud[i]);
+}
+PointCloudPublisher.publish(point_cloud_msg);
+ROS_INFO("DepthImageCallback called");
 
   // publishing filtered point cloud
-  sensor_msgs::PointCloud filtered_point_cloud_msg;
-  filtered_point_cloud_msg.header = depth_image.header;
+sensor_msgs::PointCloud filtered_point_cloud_msg;
+filtered_point_cloud_msg.header = depth_image.header;
 
-  size_t size = 0;
-  for (size_t i = 0; i < filtered_point_clouds.size(); ++i){
-  	size += filtered_point_clouds[i].size();
-  }
+size_t size = 0;
+for (size_t i = 0; i < filtered_point_clouds.size(); ++i){
+ size += filtered_point_clouds[i].size();
+}
 
-  filtered_point_cloud_msg.points.resize(size);
+filtered_point_cloud_msg.points.resize(size);
 
-  size_t iter = 0;
-  for (size_t i = 0; i < filtered_point_clouds.size(); ++i) {
-  	for (size_t j = 0; j < filtered_point_clouds[i].size(); ++j){
-  	  filtered_point_cloud_msg.points[iter] = ConvertVectorToPoint(filtered_point_clouds[i][j]);
-  	  ++iter;
-  	}
-  }
-  ransacPublisher.publish(filtered_point_cloud_msg);
+size_t iter = 0;
+for (size_t i = 0; i < filtered_point_clouds.size(); ++i) {
+ for (size_t j = 0; j < filtered_point_clouds[i].size(); ++j){
+   filtered_point_cloud_msg.points[iter] = ConvertVectorToPoint(filtered_point_clouds[i][j]);
+   ++iter;
+ }
+}
+ransacPublisher.publish(filtered_point_cloud_msg);
 
   // Publishing window
   /*sensor_msgs::PointCloud point_cloud_window_msg;
@@ -559,26 +583,30 @@ void DepthImageCallback(const sensor_msgs::Image& depth_image){
 int main(int argc, char **argv) {
   ros::init(argc, argv, "compsci403_final");
   ros::NodeHandle n;
-
   kinectT << 0.0, 0.0, screenHeight/2;
   kinectTheta = PI/4;//45 degrees
   kinectR.row(0) << cos(kinectTheta), 0, sin(kinectTheta);//turn down about y axis
   kinectR.row(1) <<         0,        1,        0;
   kinectR.row(2) <<-sin(kinectTheta), 0, cos(kinectTheta);
 
+  MarkerArray markers;
+  markers.markers.clear();
+
+  markers.markers.push_back(screen_marker);
+  markersPublisher.publish(markers);
 
   PointCloudPublisher = 
-      n.advertise<sensor_msgs::PointCloud>("kinect_PointCloud", 1);
+  n.advertise<sensor_msgs::PointCloud>("kinect_PointCloud", 1);
   ransacPublisher = 
-      n.advertise<sensor_msgs::PointCloud>("ransac_filtered_point_cloud", 1);
+  n.advertise<sensor_msgs::PointCloud>("ransac_filtered_point_cloud", 1);
   windowPublisher = 
-      n.advertise<sensor_msgs::PointCloud>("window_point_cloud", 1);
+  n.advertise<sensor_msgs::PointCloud>("window_point_cloud", 1);
   markersPublisher = 
-  	  n.advertise<visualization_msgs::MarkerArray>("laser_pointer_simulation", 10);
+  n.advertise<visualization_msgs::MarkerArray>("laser_pointer_simulation", 10);
   
 
   ros::Subscriber depth_image_subscriber =
-      n.subscribe("/Cobot/Kinect/Depth", 1, DepthImageCallback);
+  n.subscribe("/Cobot/Kinect/Depth", 1, DepthImageCallback);
 
   ros::spin();
 
