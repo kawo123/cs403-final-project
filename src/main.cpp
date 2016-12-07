@@ -21,6 +21,7 @@ using Eigen::Matrix3f;
 using Eigen::Vector3f;
 using Eigen::Vector2f;
 using geometry_msgs::Point;
+using geometry_msgs::Point32;
 using std::fabs;
 using std::max;
 using std::atan2;
@@ -136,6 +137,20 @@ Vector3f ConvertPointToVector(const Point& point) {
 // Helper function to convert Eigen Vectors to ROS Point32.
 Point ConvertVectorToPoint(const Vector3f& vector) {
   Point point;
+  point.x = vector.x();
+  point.y = vector.y();
+  point.z = vector.z();
+  return point;
+}
+
+// Helper function to convert ROS Point32 to Eigen Vectors.
+Vector3f ConvertPoint32ToVector(const Point32& point) {
+  return Vector3f(point.x, point.y, point.z);
+}
+
+// Helper function to convert Eigen Vectors to ROS Point32.
+Point32 ConvertVectorToPoint32(const Vector3f& vector) {
+  Point32 point;
   point.x = vector.x();
   point.y = vector.y();
   point.z = vector.z();
@@ -541,7 +556,7 @@ sensor_msgs::PointCloud point_cloud_msg;
 point_cloud_msg.header = depth_image.header;
 point_cloud_msg.points.resize(point_cloud.size());
 for (size_t i = 0; i < point_cloud.size(); ++i) {
- point_cloud_msg.points[i] = ConvertVectorToPoint(point_cloud[i]);
+ point_cloud_msg.points[i] = ConvertVectorToPoint32(point_cloud[i]);
 }
 PointCloudPublisher.publish(point_cloud_msg);
 ROS_INFO("DepthImageCallback called");
@@ -560,7 +575,7 @@ filtered_point_cloud_msg.points.resize(size);
 size_t iter = 0;
 for (size_t i = 0; i < filtered_point_clouds.size(); ++i) {
  for (size_t j = 0; j < filtered_point_clouds[i].size(); ++j){
-   filtered_point_cloud_msg.points[iter] = ConvertVectorToPoint(filtered_point_clouds[i][j]);
+   filtered_point_cloud_msg.points[iter] = ConvertVectorToPoint32(filtered_point_clouds[i][j]);
    ++iter;
  }
 }
