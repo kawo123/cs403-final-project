@@ -377,7 +377,7 @@ bool RANSAC(vector<Vector3f> point_cloud, vector<Vector3f>* filtered_point_cloud
   float best_inlier_fraction = 0;
   float dist_epsilon = 0.06;
   float inlier_fraction = 0.0; 
-  float min_inlier_fraction = 0.35;
+  float min_inlier_fraction = 0.55;
   
   // RANSAC for cylinder
   // do{
@@ -405,7 +405,7 @@ bool RANSAC(vector<Vector3f> point_cloud, vector<Vector3f>* filtered_point_cloud
     FindInliers(P1, P2, dist_epsilon, point_cloud, &new_inliers);
 
     inlier_fraction = static_cast<float>(new_inliers.size()) / static_cast<float>(point_cloud.size());
-    printf("In RANSAC: the inlier_fraction is %f\n", inlier_fraction);
+    //printf("In RANSAC: the inlier_fraction is %f\n", inlier_fraction);
     if (inlier_fraction > min_inlier_fraction && inlier_fraction > best_inlier_fraction) {
       best_inlier_fraction = inlier_fraction;
       inliers = new_inliers;
@@ -441,17 +441,24 @@ return window;
 }
 
 void FSLF(vector<Vector3f> point_cloud, 
+  unsigned int n, 
+  unsigned int k,
+  float window_size, 
+  const vector<struct line> old_lines,    
   vector< vector<Vector3f> >* filtered_point_clouds, 
   vector<struct line>* valid_lines){ 
+
   vector< vector<Vector3f> > inlier_point_clouds;
   vector<struct line> lines; 
-  float window_size = 0.5;
   unsigned int minWindowpoints = 100;
+  float safetyDist = 0.8;
 
-  unsigned int n = 2;
-  unsigned int k = 40;
+  //temp
+  //window_size = 0.5;
+  //n = 2;
+  //k = 40;
 
-  for (size_t i = 0; i < last_found_lines.size(); ++i){
+  /*for (size_t i = 0; i < last_found_lines.size(); ++i){
   	vector<Vector3f> point_cloud_window = getWindow(point_cloud, last_found_lines[i].p0, window_size);
   	ROS_INFO("starting ransac");
     vector<Vector3f> filtered_point_cloud;
@@ -464,10 +471,10 @@ void FSLF(vector<Vector3f> point_cloud,
       }
     }
     k--;
-  }
+  }*/
 
   do{
-  	vector<Vector3f> point_cloud_window;
+  	/*vector<Vector3f> point_cloud_window;
   	unsigned int count = 0;
   	do {
      count++;
@@ -477,7 +484,28 @@ void FSLF(vector<Vector3f> point_cloud,
      if (count > k){
        break;
      }
-   }while(point_cloud_window.size() < minWindowpoints);
+   }while(point_cloud_window.size() < minWindowpoints);*/
+
+   Vector3f p;
+   bool pIsValid = false;
+   while (!pIsValid && k > 0){
+     p = point_cloud[rand() % point_cloud.size()];
+     pIsValid = true;
+     for(size_t i = 0; i < old_lines.size(); ++i){
+       if ((old_lines[i].p0 - p).norm() < safetyDist){
+         pIsValid = false;
+         --k;
+         break;
+       }
+     }
+   }
+   if (k <= 0){
+     break;
+   }
+   vector<Vector3f> point_cloud_window = getWindow(point_cloud, p, window_size);
+
+   //Vector3f p = point_cloud[rand() % point_cloud.size()];
+   //vector<Vector3f> point_cloud_window = getWindow(point_cloud, p, window_size);
 
    ROS_INFO("starting ransac");
    vector<Vector3f> filtered_point_cloud;
@@ -538,13 +566,35 @@ for (size_t i = 0; i < temp_point_cloud.size(); ++i){
 }
 
   //ransac for cylinders
-vector< vector<Vector3f> > filtered_point_clouds; 
-vector<struct line> lines;
   // GetCylinderFilteredPointCloud(depth_image, point_cloud, filtered_point_cloud);
 
   //RANSAC(point_cloud, &filtered_point_cloud);
-FSLF(point_cloud, &filtered_point_clouds, &lines);
+
+vector< vector<Vector3f> > filtered_point_clouds; 
+vector<struct line> lines;
+
+vector< vector<Vector3f> > newfiltered_point_clouds;
+vector<struct line> newlines;
+
+for (size_t i = 0; i < last_found_lines.size(); ++i){
+  FSLF(getWindow(point_cloud, last_found_lines[i].p0, 1), 1, 8, 0.8, lines, &newfiltered_point_clouds, &newlines);
+  for(size_t i = 0; i < newlines.size(); ++i){
+    lines.push_back(newlines[i]);
+  }
+  for(size_t i = 0; i < newfiltered_point_clouds.size(); ++i){
+    filtered_point_clouds.push_back(newfiltered_point_clouds[i]);
+  }
+}
+
+FSLF(point_cloud, 1, 40, 0.8, lines, &newfiltered_point_clouds, &newlines);
+for(size_t i = 0; i < newlines.size(); ++i){
+  lines.push_back(newlines[i]);
+}
+for(size_t i = 0; i < newfiltered_point_clouds.size(); ++i){
+  filtered_point_clouds.push_back(newfiltered_point_clouds[i]);
+}
 last_found_lines = lines;
+ROS_INFO("found %d lines", lines.size());
   //vector<Vector3f> point_cloud_window = FSLF(point_cloud, &filtered_point_cloud);
 
   // cout << filtered_point_cloud[0] << std::endl;
