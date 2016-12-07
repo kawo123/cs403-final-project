@@ -32,6 +32,47 @@ using visualization_msgs::MarkerArray;
 using std::cout;
 using std::vector;
 
+
+struct Rectangle{
+  Vector3f topleft;
+  Vector3f topright;
+  Vector3f bottomright;
+  Vector3f bottomleft;
+
+  Rectangle(Vector3f point1, Vector3f point2, Vector3f point3, Vector3f point4){
+    topleft = point1;
+    topright = point2;
+    bottomright = point3;
+    bottomleft = point4;
+  }
+};
+
+
+struct Line{ //this is Line struct for displaying the screen only
+  Vector3f p1;
+  Vector3f p2; 
+
+  Line(Vector3f x, Vector3f y){
+    p1 = x; 
+    p2 = y; 
+  }
+}; 
+
+
+struct cylinder
+{
+  Vector3f p0;
+  Vector3f l;
+  float r;
+};
+
+struct line
+{
+  Vector3f p0;
+  Vector3f l;
+};
+
+
 const float p_x = 320;
 const float p_y = 240;
 const float f_x = 588.446;
@@ -53,31 +94,7 @@ Vector3f kinectT;
 float kinectTheta;
 Matrix3f kinectR;
 
-struct cylinder
-{
-  Vector3f p0;
-  Vector3f l;
-  float r;
-};
-
-struct line
-{
-  Vector3f p0;
-  Vector3f l;
-};
-
-
-struct Line{ //this is Line struct for displaying the screen only
-  Vector3f p1;
-  Vector3f p2; 
-
-  Line(Vector3f x, Vector3f y){
-    p1 = x; 
-    p2 = y; 
-  }
-}; 
 vector<Line> map; 
-
 
 
 vector<struct line> last_found_lines;
@@ -129,12 +146,12 @@ void InitMarkers() {
   laser_dot_marker.color.b = 1.0;
 }
 
-// Helper function to convert ROS Point32 to Eigen Vectors.
+// Helper function to convert ROS Point to Eigen Vectors.
 Vector3f ConvertPointToVector(const Point& point) {
   return Vector3f(point.x, point.y, point.z);
 }
 
-// Helper function to convert Eigen Vectors to ROS Point32.
+// Helper function to convert Eigen Vectors to ROS Point.
 Point ConvertVectorToPoint(const Vector3f& vector) {
   Point point;
   point.x = vector.x();
@@ -189,7 +206,7 @@ void DrawLine(const Vector3f& p1,
     return sqrt(pow(diffX, 2) + pow(diffY, 2) + pow(diffZ, 2));
   }
 
-bool checkCylinder(const struct cylinder){//given a struct cylinder
+bool checkCylinder(cylinder cylinder){//given a struct cylinder
 	//for displaying cylinder on rviz, use marker
 	//checks if cylinder radius is acceptable and whether or not the line corresponding with the cylinder intercepts the projector plane (rviz projector plane)
 	//if yes, return true
@@ -209,18 +226,63 @@ bool checkCylinder(const struct cylinder){//given a struct cylinder
   return true;
 }
 
-// helper method for checkLine, given a line it 
-// finds where the line intersects with the screen's plane
-Vector3f line_to_plane_intersection(const struct line){
-  Vector3f p;
-  return p;
-}
-
 // checks if the given line intersects with the screen's plane
 // returns true if it is valid and false otherwize
-bool checkLine(const struct line){
-  return 0;
+bool checkLine(line line, Rectangle screen, Point *intersection){
+  //followed this tutorial: http://gamedev.stackexchange.com/questions/7331/ray-plane-intersection-to-find-the-z-of-the-intersecting-point
+  //uses Rectangle as two triangles
+  Vector3f e1 = screen.topright - screen.topleft;
+  Vector3f e2 = screen.bottomright - screen.topleft;
+  Vector3f s1 = (line.l).cross(e2);
+
+  float divisor = s1.dot(e2);
+  if(divisor == 0){
+    return false; //not hit
+  }
+  //otherwise if divisor isn't 0, won't divide by 0
+  float invDivisor = 1 / divisor;
+
+  //compute barycentric(?) coordinate
+  Vector3f d = line.p0 - screen.topleft;
+
+  float b1 = d.dot(s1) * invDivisor;
+  if(b1 < 0 || b1 >1){
+    return false; //not hit
+  }
+
+  //compute second barycentric coordinate
+  Vector3f s2 = d.cross(e1);
+  float b2 = (line.l).dot(s2) * invDivisor;
+
+  if(b2 < 0 || b1 + b2 > 1){
+    return false; //not hit
+  }
+
+  //compute t to intersection distance
+  float t = e2.dot(s2) * invDivisor; //Z value?
+  Vector3f intersectionvector = line.p0 + (t * line.l);
+  *intersection = ConvertVectorToPoint(intersectionvector);
+  return true;
 }
+
+//
+Point lineIntersectPlane(line line){
+    Rectangle screen = Rectangle(Vector3f(-1.5, 0, 0), Vector3f(1.5, 0, 0), Vector3f(-1.5, 1.5, 0), Vector3f(-1.5, 0, 0));
+    Point intersection;
+    intersection.x = 0;   
+    intersection.y = 0;
+    intersection.z = 0;
+    //return the Point
+    //else returns the origin (could be Point anywhere; I just made intersection at (0,0,0) because I 
+    //just want to show that the line doesn't intersect with plane)
+    if(!checkLine(line, screen, &intersection)){
+      ROS_INFO("Does not insect with plane");
+    }
+    return intersection;
+    
+}
+
+
 
 // Uses a marker array to display the bounding lines 
 // of the screen and the dots on the screen 
@@ -229,19 +291,22 @@ void displayScreen(const vector<Vector3f> laserpointers){//, MarkerArray *marker
   //(markers*).markers.push_back()
 
   for(size_t i = 0; i<laserpointers.size(); ++i){
-    DrawPoint(laserpointers[i], &screen_marker);
+    DrawPoint(laserpointers[i], &laser_dot_marker);
   }
   map.push_back(Line(Vector3f(-1.5, 0, 0), Vector3f(1.5, 0, 0))); 
-  map.push_back(Line(Vector3f(1.5, 0, 0), Vector3f(-1.5, 0, 0))); 
+  map.push_back(Line(Vector3f(1.5, 0, 0), Vector3f(-1.5, 1.5, 0))); 
+  map.push_back(Line(Vector3f(-1.5, 1.5, 0), Vector3f(-1.5, 0, 0))); 
   map.push_back(Line(Vector3f(-1.5, 0, 0), Vector3f(-1.5, 0, 0))); 
-  map.push_back(Line(Vector3f(-1.5, 0, 0), Vector3f(1.5, 1.5, 0))); 
 
 
 
 }
 
 // Using a marker array this displays the lasers
-bool displayLines(const vector<struct line> lines, MarkerArray* markers){
+bool displayLines(const vector<struct line> lines){
+  for(size_t i = 0; i<lines.size(); ++i){
+    DrawLine(lines[i].p0, lines[i].l, &laser_marker);
+  }
   return true;
 }
 
@@ -656,7 +721,7 @@ int main(int argc, char **argv) {
 
   MarkerArray markers;
   markers.markers.clear();
-
+  //displayScreen()
   markers.markers.push_back(screen_marker);
   markersPublisher.publish(markers);
 
