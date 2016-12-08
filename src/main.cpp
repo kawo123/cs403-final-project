@@ -228,7 +228,7 @@ bool checkCylinder(cylinder cylinder){//given a struct cylinder
 
 // checks if the given line intersects with the screen's plane
 // returns true if it is valid and false otherwize
-bool checkLine(line line, Rectangle screen, Point *intersection){
+bool checkLine(line line, Rectangle screen, Vector3f *intersection){
   //followed this tutorial: http://gamedev.stackexchange.com/questions/7331/ray-plane-intersection-to-find-the-z-of-the-intersecting-point
   //uses Rectangle as two triangles
   Vector3f e1 = screen.topright - screen.topleft;
@@ -260,18 +260,17 @@ bool checkLine(line line, Rectangle screen, Point *intersection){
 
   //compute t to intersection distance
   float t = e2.dot(s2) * invDivisor; //Z value?
-  Vector3f intersectionvector = line.p0 + (t * line.l);
-  *intersection = ConvertVectorToPoint(intersectionvector);
+  *intersection = line.p0 + (t * line.l);
   return true;
 }
 
 //
-Point lineIntersectPlane(line line){
+Vector3f lineIntersectPlane(line line){
     Rectangle screen = Rectangle(Vector3f(-1.5, 0, 0), Vector3f(1.5, 0, 0), Vector3f(-1.5, 1.5, 0), Vector3f(-1.5, 0, 0));
-    Point intersection;
-    intersection.x = 0;   
-    intersection.y = 0;
-    intersection.z = 0;
+    Vector3f intersection;
+    intersection.x() = 0;   
+    intersection.y() = 0;
+    intersection.z() = 0;
     //return the Point
     //else returns the origin (could be Point anywhere; I just made intersection at (0,0,0) because I 
     //just want to show that the line doesn't intersect with plane)
@@ -284,30 +283,31 @@ Point lineIntersectPlane(line line){
 
 
 
-// Uses a marker array to display the bounding lines 
-// of the screen and the dots on the screen 
-// corisponding to the laser pointers
-void displayScreen(const vector<Vector3f> laserpointers){//, MarkerArray *markers){
-  //(markers*).markers.push_back()
-
-  for(size_t i = 0; i<laserpointers.size(); ++i){
-    DrawPoint(laserpointers[i], &laser_dot_marker);
-  }
+// displays the bounding lines  of the screen on a map of Lines
+void displayScreen(){
   map.push_back(Line(Vector3f(-1.5, 0, 0), Vector3f(1.5, 0, 0))); 
   map.push_back(Line(Vector3f(1.5, 0, 0), Vector3f(-1.5, 1.5, 0))); 
   map.push_back(Line(Vector3f(-1.5, 1.5, 0), Vector3f(-1.5, 0, 0))); 
   map.push_back(Line(Vector3f(-1.5, 0, 0), Vector3f(-1.5, 0, 0))); 
 
 
+  for (size_t i = 0; i < map.size(); ++i) {
+    DrawLine(map[i].p1, map[i].p2, &screen_marker);
+  }
 
 }
 
-// Using a marker array this displays the lasers
-bool displayLines(const vector<struct line> lines){
+//displays the laser points and pushes to laser dot markers
+void displayPoints(const vector<Vector3f> laserpointers){
+  for(size_t i = 0; i<laserpointers.size(); ++i){
+    DrawPoint(laserpointers[i], &laser_dot_marker);
+  }
+}
+//displays the lasers and pushes to laser line markers
+void displayLines(const vector<struct line> lines){
   for(size_t i = 0; i<lines.size(); ++i){
     DrawLine(lines[i].p0, lines[i].l, &laser_marker);
   }
-  return true;
 }
 
 struct cylinder getBestCylinder(vector<Vector3f> filteredPointCloud){
@@ -722,7 +722,11 @@ int main(int argc, char **argv) {
   MarkerArray markers;
   markers.markers.clear();
   //displayScreen()
+
   markers.markers.push_back(screen_marker);
+  markers.markers.push_back(laser_dot_marker);
+  markers.markers.push_back(laser_marker);
+
   markersPublisher.publish(markers);
 
   PointCloudPublisher = 
