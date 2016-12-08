@@ -235,7 +235,7 @@ bool checkLine(line line, Rectangle screen, Vector3f *intersection){
   Vector3f e2 = screen.topright - screen.topleft;
   Vector3f s1 = (line.l).cross(e2);
 
-  float divisor = s1.dot(e2);
+  float divisor = s1.dot(e1);
   if(divisor == 0){
     return false; //not hit
   }
@@ -243,7 +243,7 @@ bool checkLine(line line, Rectangle screen, Vector3f *intersection){
   float invDivisor = 1 / divisor;
 
   //compute barycentric(?) coordinate
-  Vector3f d = line.p0 - screen.topleft;
+  Vector3f d = line.p0 - screen.bottomleft;
 
   float b1 = d.dot(s1) * invDivisor;
   if(b1 < 0 || b1 >1){
