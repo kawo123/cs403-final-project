@@ -231,8 +231,8 @@ bool checkCylinder(cylinder cylinder){//given a struct cylinder
 bool checkLine(line line, Rectangle screen, Vector3f *intersection){
   //followed this tutorial: http://gamedev.stackexchange.com/questions/7331/ray-plane-intersection-to-find-the-z-of-the-intersecting-point
   //uses Rectangle as two triangles
-  Vector3f e1 = screen.topright - screen.topleft;
-  Vector3f e2 = screen.bottomright - screen.topleft;
+  Vector3f e1 = screen.topleft - screen.bottomleft;
+  Vector3f e2 = screen.topright - screen.topleft;
   Vector3f s1 = (line.l).cross(e2);
 
   float divisor = s1.dot(e2);
@@ -278,7 +278,6 @@ Vector3f lineIntersectPlane(line line){
       ROS_INFO("Does not insect with plane");
     }
     return intersection;
-    
 }
 
 
