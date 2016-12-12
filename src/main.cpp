@@ -515,7 +515,7 @@ void FSLF(vector<Vector3f> point_cloud,
   vector< vector<Vector3f> > inlier_point_clouds;
   vector<struct line> lines; 
   unsigned int minWindowpoints = 100;
-  float safetyDist = 0.8;
+  float safetyDist = 2;
 
   //temp
   //window_size = 0.5;
@@ -575,8 +575,15 @@ void FSLF(vector<Vector3f> point_cloud,
    vector<Vector3f> filtered_point_cloud;
    if (RANSAC(point_cloud_window, &filtered_point_cloud)){
     ROS_INFO("found a line");
-    inlier_point_clouds.push_back(filtered_point_cloud);
-    lines.push_back(getBestFitLine(filtered_point_cloud));
+    struct line newLine = getBestFitLine(filtered_point_cloud);
+    float centered_window_percent_inliers = ((float)filtered_point_cloud.size())/((float)getWindow(point_cloud, newLine.p0, window_size).size());
+    ROS_INFO("centered percent inliers: %f", centered_window_percent_inliers);
+
+    if (centered_window_percent_inliers >= 0.55){
+      inlier_point_clouds.push_back(filtered_point_cloud);
+      lines.push_back(newLine);
+    }
+    
     if (inlier_point_clouds.size() > n - 1){
      break;
    }
