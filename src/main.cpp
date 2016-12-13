@@ -285,14 +285,15 @@ Vector3f lineIntersectPlane(line line){
 // displays the bounding lines  of the screen on a map of Lines
 void displayScreen(){
   map.push_back(Line(Vector3f(-1.5, 0, 0), Vector3f(1.5, 0, 0))); 
-  map.push_back(Line(Vector3f(1.5, 0, 0), Vector3f(-1.5, 1.5, 0))); 
+  map.push_back(Line(Vector3f(1.5, 0, 0), Vector3f(1.5, 1.5, 0))); 
+  map.push_back(Line(Vector3f(1.5, 1.5, 0), Vector3f(-1.5, 1.5, 0))); 
   map.push_back(Line(Vector3f(-1.5, 1.5, 0), Vector3f(-1.5, 0, 0))); 
-  map.push_back(Line(Vector3f(-1.5, 0, 0), Vector3f(-1.5, 0, 0))); 
 
 
-  for (size_t i = 0; i < map.size(); ++i) {
-    DrawLine(map[i].p1, map[i].p2, &screen_marker);
+  for(size_t i = 0; i<map.size(); ++i){
+    DrawLine(map[i].p1,map[i].p2, &screen_marker);
   }
+
 
 }
 
@@ -710,6 +711,7 @@ ransacPublisher.publish(filtered_point_cloud_msg);
 
 
 int main(int argc, char **argv) {
+  InitMarkers();
   ros::init(argc, argv, "compsci403_final");
   ros::NodeHandle n;
   kinectT << 0.0, 0.0, screenHeight/2;
@@ -720,13 +722,11 @@ int main(int argc, char **argv) {
 
   MarkerArray markers;
   markers.markers.clear();
-  //displayScreen()
-
+  displayScreen();
   markers.markers.push_back(screen_marker);
   markers.markers.push_back(laser_dot_marker);
   markers.markers.push_back(laser_marker);
 
-  markersPublisher.publish(markers);
 
   PointCloudPublisher = 
   n.advertise<sensor_msgs::PointCloud>("kinect_PointCloud", 1);
@@ -740,8 +740,17 @@ int main(int argc, char **argv) {
 
   ros::Subscriber depth_image_subscriber =
   n.subscribe("/Cobot/Kinect/Depth", 1, DepthImageCallback);
+  
+  ros::Rate loop_rate(10);
 
-  ros::spin();
+  while(ros::ok()){
+    markersPublisher.publish(markers);
+    ros::spinOnce();
+    loop_rate.sleep();
+    
+  }
+
+
 
   return 0;
 }
