@@ -7,6 +7,7 @@
 #include <limits>
 
 #include <eigen3/Eigen/Dense>
+#include <eigen3/Eigen/Eigenvalues>
 #include <geometry_msgs/Point.h>
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/PointCloud.h>
@@ -322,6 +323,32 @@ struct line getBestFitLine(vector<Vector3f> point_cloud){
   l.p0(1) = l.p0(1)/point_cloud.size();
   l.p0(2) = l.p0(2)/point_cloud.size();
 
+  MatrixXf M(point_cloud.size(), 3);
+  for (size_t i = 0; i < point_cloud.size(); ++i){
+    M.row(i) = point_cloud[i];
+  }
+
+  Matrix3f A = M.transpose()*M;
+
+  Eigen::EigenSolver<Matrix3f> eigen_solver;
+
+  eigen_solver.compute(A);
+  Vector3f eigen_values = eigen_solver.eigenvalues().real();
+  Matrix3f eigen_vectors = eigen_solver.eigenvectors().real();
+
+  int null_space_iVector = 0;
+  int smallest_eigen_value = fabs(eigen_values(null_space_iVector));
+
+  for (size_t i = 1; i < 3; ++i){
+    int new_eigen_value = fabs(eigen_values(i));
+    if (new_eigen_value < smallest_eigen_value){
+      null_space_iVector = i;
+      smallest_eigen_value = new_eigen_value;
+    }
+  }
+
+  l.l = eigen_vectors.col(null_space_iVector);
+
 
   return l;
 }
@@ -537,17 +564,10 @@ for(size_t i = 0; i < newfiltered_point_clouds.size(); ++i){
 last_found_lines = lines;
 ROS_INFO("found %d lines", lines.size());
 
-//ROS_INFO("markers size1: %lu", Markers.markers.size());
-//Markers.markers.clear();
-//ROS_INFO("markers size2: %lu", Markers.markers.size());
 ClearMarker(&laser_marker);
 for (size_t i = 0; i < lines.size(); ++i){
-  DrawLine(Vector3f(0, 0, 0), lines[i].p0, &laser_marker);
-  //Markers.markers.push_back(laser_marker);
+  DrawLine(lines[i].p0, lines[i].l + lines[i].p0, &laser_marker);
 }
-//ROS_INFO("markers size3: %lu", Markers.markers.size());
-//markersPublisher.publish(Markers);
-//ROS_INFO("markers size4: %lu", Markers.markers.size());
 
   // Publshing point cloud
 sensor_msgs::PointCloud point_cloud_msg;
