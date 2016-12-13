@@ -209,6 +209,7 @@ void DrawLine(const Vector3f& p1,
 // checks if the given line intersects with the screen's plane
 // returns true if it is valid and false otherwize
 bool checkLine(line line, Rectangle screen, Vector3f *intersection){
+  //source : https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection
   //n is normal of e1 and e2
   Vector3f e2 = screen.topright - screen.topleft;
   Vector3f e1 = screen.bottomleft - screen.topleft;
