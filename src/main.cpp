@@ -206,26 +206,6 @@ void DrawLine(const Vector3f& p1,
     return sqrt(pow(diffX, 2) + pow(diffY, 2) + pow(diffZ, 2));
   }
 
-bool checkCylinder(cylinder cylinder){//given a struct cylinder
-	//for displaying cylinder on rviz, use marker
-	//checks if cylinder radius is acceptable and whether or not the line corresponding with the cylinder intercepts the projector plane (rviz projector plane)
-	//if yes, return true
-	//if not return false
-
-  // Vector3f p0 = cylinder.p0;
-  // Vector3f l = cylinder.l;
-  // float r = cylinder.r;
-
-  // if(r > 0.4 and r<0.8){
-  //   if((p0 - screenP0).dot(l) == 0){
-  //     return true;
-  //   }
-  // }
-
-  // return false;
-  return true;
-}
-
 // checks if the given line intersects with the screen's plane
 // returns true if it is valid and false otherwize
 bool checkLine(line line, Rectangle screen, Vector3f *intersection){
@@ -309,55 +289,6 @@ void displayLines(const vector<struct line> lines){
   }
 }
 
-struct cylinder getBestCylinder(vector<Vector3f> filteredPointCloud){
-  struct cylinder c;
-  return c;
-}
-
-bool GetCylinderFilteredPointCloud(const sensor_msgs::Image& depth_image, 
-  vector<Vector3f> point_cloud, 
-  vector<Vector3f> filtered_point_cloud){
-  // user variables
-  int max_neighborhoods = 0;
-  int neightborhood_size = 100; 
-  int deviation = neightborhood_size / 2; 
-  int num_local_sample = 20; 
-  int point_cloud_size = point_cloud.size(); 
-
-  // parameters
-  int num_point_per_row = depth_image.width / 10; 
-
-  // Fast plane filtering for cylinders
-  int i = 0; 
-  int neighborhood_counter = 0; 
-  while(i < point_cloud_size && neighborhood_counter < max_neighborhoods){
-    int D0 = rand() % point_cloud_size; 
-    int D1 = D0 + (rand() % neightborhood_size + 1) - deviation;
-    // abs(D1 - D0): distance from D0 to D1
-    // abs((D1 / num_point_per_row) - (D0 / num_point_per_row)): distance from row of D0 to row of D1
-    while( abs(D1 - D0) > deviation || abs((D1 / num_point_per_row) - (D0 / num_point_per_row)) > deviation){
-      D1 = D0 + (rand() % neightborhood_size + 1) - deviation;
-    } 
-    int D2 = D0 + (rand() % neightborhood_size + 1) - deviation;
-    while( abs(D2 - D0) > deviation || abs((D2 / num_point_per_row) - (D0 / num_point_per_row)) > deviation){
-      D2 = D0 + (rand() % neightborhood_size + 1) - deviation;
-    } 
-    
-    // Vector3f randomD0 = point_cloud[D0];
-    // Vector3f randomD1 = point_cloud[D1];
-    // Vector3f randomD2 = point_cloud[D2];
-
-    // TODO: Finish Fast Sampling plane Filtering
-
-    // cout<<"The size of point cloud is " << point_cloud_size <<endl;
-
-    i++; 
-    neighborhood_counter++; 
-  }
-
-  return true; 
-}
-
 void FitMinimalCylindericalModel(const Vector3f& P1,
  const Vector3f& P2,
  const Vector3f& P3,
@@ -378,24 +309,7 @@ void FitMinimalPlane(const Vector3f& avg,
   *n = (P21.cross(P31)).normalized();
 }
 
-// void FindInliers(const Vector3f& n,
-//                  const Vector3f& P0,
-//                  float radius, 
-//                  float epsilon,
-//                  const vector<Vector3f>& point_cloud,
-//                  vector<Vector3f>* inliers) {
-//   inliers->clear();
-//   n.normalized(); 
-//   for (size_t i = 0; i < point_cloud.size(); ++i) {
-//     float projection = abs((point_cloud[i] - P0).dot(n)); 
-//     float theta = acos(projection / point_cloud[i].norm()); 
-//     float dist = sin(theta) * point_cloud[i].norm(); 
-//     // printf("In FindInliers: The distance is %f\n", dist);
-//     if (fabs(dist - radius) < epsilon) {
-//       inliers->push_back(point_cloud[i]);
-//     }
-//   }
-// }
+
 struct line getBestFitLine(vector<Vector3f> point_cloud){
   struct line l;
   l.p0(0) = 0;
@@ -435,29 +349,15 @@ void FindInliers(Vector3f P,
 }
 
 bool RANSAC(vector<Vector3f> point_cloud, vector<Vector3f>* filtered_point_cloud){
-  // TODO: Added return value or side effect 
+  if (point_cloud.size() == 0){
+    return false;
+  }
 
   vector<Vector3f> inliers; 
   float best_inlier_fraction = 0;
   float dist_epsilon = 0.06;
   float inlier_fraction = 0.0; 
   float min_inlier_fraction = 0.55;
-  
-  // RANSAC for cylinder
-  // do{
-  //   Vector3f P1 = point_cloud[rand() % point_cloud_size];
-  //   Vector3f P2 = point_cloud[rand() % point_cloud_size];
-  //   Vector3f P3 = point_cloud[rand() % point_cloud_size];
-  //   Vector3f avg = (P1 + P2 + P3) / 3; 
-  //   float r = (CalculateDistance(P1, avg) + CalculateDistance(P2, avg) + CalculateDistance(P3, avg))/3; 
-  //   FitMinimalPlane(avg, P2, P3, &n, &P0);
-  //   FindInliers(n, P0, r, dist_epsilon, point_cloud, &inliers);
-
-  //   inlier_fraction = static_cast<float>(inliers.size()) / static_cast<float>(point_cloud.size());
-  //   printf("In RANSAC: the inlier_fraction is %f\n", inlier_fraction);
-  // }while(inlier_fraction < min_inlier_fraction);
-
-  // *filtered_point_cloud = inliers; 
 
 
   // RANSAC for line
@@ -484,8 +384,8 @@ bool RANSAC(vector<Vector3f> point_cloud, vector<Vector3f>* filtered_point_cloud
 }
 
 vector<Vector3f> getWindow(const vector<Vector3f> point_cloud, 
- const Vector3f p, 
- const float window_size){
+                           const Vector3f p, 
+                           const float window_size){
   vector<Vector3f> window;
   const float w = window_size/2;
   const float Xmax = p.x() + w;
@@ -512,10 +412,16 @@ void FSLF(vector<Vector3f> point_cloud,
   vector< vector<Vector3f> >* filtered_point_clouds, 
   vector<struct line>* valid_lines){ 
 
+  if (point_cloud.size() == 0){
+    return;
+  }
+
+  printf("0\n");
   vector< vector<Vector3f> > inlier_point_clouds;
   vector<struct line> lines; 
   unsigned int minWindowpoints = 100;
   float safetyDist = 2;
+  printf("1\n");
 
   //temp
   //window_size = 0.5;
@@ -552,6 +458,7 @@ void FSLF(vector<Vector3f> point_cloud,
 
    Vector3f p;
    bool pIsValid = false;
+   printf("2\n");
    while (!pIsValid && k > 0){
      p = point_cloud[rand() % point_cloud.size()];
      pIsValid = true;
@@ -562,7 +469,9 @@ void FSLF(vector<Vector3f> point_cloud,
          break;
        }
      }
+     printf("done with lines\n");
    }
+   printf("3\n");
    if (k <= 0){
      break;
    }
@@ -592,6 +501,7 @@ void FSLF(vector<Vector3f> point_cloud,
 }while(k > 0);
 *filtered_point_clouds = inlier_point_clouds; 
 *valid_lines = lines;
+printf("4\n");
 }
 
 void DepthImageCallback(const sensor_msgs::Image& depth_image){
