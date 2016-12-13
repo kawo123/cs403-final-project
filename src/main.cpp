@@ -18,6 +18,7 @@
 #define PI 3.14159265 //M_PI
 
 using Eigen::Matrix3f;
+using Eigen::MatrixXf;
 using Eigen::Vector3f;
 using Eigen::Vector2f;
 using geometry_msgs::Point;
@@ -124,7 +125,7 @@ void InitMarkers() {
   screen_marker.color.b = 0.0;
 
   laser_marker.header.frame_id = "kinect_0";//"camera_depth_optical_frame";
-  laser_marker.id = 2;
+  laser_marker.id =2;
   laser_marker.type = Marker::LINE_LIST;
   laser_marker.action = Marker::MODIFY;
   laser_marker.scale.x = 0.05;
@@ -133,7 +134,6 @@ void InitMarkers() {
   laser_marker.color.r = 1.0;
   laser_marker.color.g = 0.0;
   laser_marker.color.b = 0.0;
-
 
   laser_dot_marker.header.frame_id = "kinect_0";//"camera_depth_optical_frame";
   laser_dot_marker.id = 3;
@@ -186,6 +186,10 @@ void DrawLine(const Vector3f& p1,
               Marker* marker) {
   marker->points.push_back(ConvertVectorToPoint(p1));
   marker->points.push_back(ConvertVectorToPoint(p2));
+}
+
+void ClearMarker(Marker* marker){
+  marker->points.clear();
 }
 
 // Helper function to find the magnitude of Vector2f
@@ -317,6 +321,8 @@ struct line getBestFitLine(vector<Vector3f> point_cloud){
   l.p0(0) = l.p0(0)/point_cloud.size();
   l.p0(1) = l.p0(1)/point_cloud.size();
   l.p0(2) = l.p0(2)/point_cloud.size();
+
+
   return l;
 }
 
@@ -531,17 +537,17 @@ for(size_t i = 0; i < newfiltered_point_clouds.size(); ++i){
 last_found_lines = lines;
 ROS_INFO("found %d lines", lines.size());
 
-ROS_INFO("markers size1: %lu", Markers.markers.size());
-Markers.markers.clear();
-ROS_INFO("markers size2: %lu", Markers.markers.size());
-
+//ROS_INFO("markers size1: %lu", Markers.markers.size());
+//Markers.markers.clear();
+//ROS_INFO("markers size2: %lu", Markers.markers.size());
+ClearMarker(&laser_marker);
 for (size_t i = 0; i < lines.size(); ++i){
   DrawLine(Vector3f(0, 0, 0), lines[i].p0, &laser_marker);
-  Markers.markers.push_back(laser_marker);
+  //Markers.markers.push_back(laser_marker);
 }
-ROS_INFO("markers size3: %lu", Markers.markers.size());
-markersPublisher.publish(Markers);
-ROS_INFO("markers size4: %lu", Markers.markers.size());
+//ROS_INFO("markers size3: %lu", Markers.markers.size());
+//markersPublisher.publish(Markers);
+//ROS_INFO("markers size4: %lu", Markers.markers.size());
 
   // Publshing point cloud
 sensor_msgs::PointCloud point_cloud_msg;
@@ -581,8 +587,6 @@ ransacPublisher.publish(filtered_point_cloud_msg);
     point_cloud_window_msg.points[i] = ConvertVectorToPoint(point_cloud_window[i]);
   }
   windowPublisher.publish(point_cloud_window_msg);*/
-
-  //markersPublisher.publish(Markers);
 }
 
 
@@ -660,6 +664,9 @@ int main(int argc, char **argv) {
 
   while(ros::ok()){
     MarkerArray markers;
+    markers.markers.push_back(screen_marker);
+    markers.markers.push_back(laser_dot_marker);
+    markers.markers.push_back(laser_marker);
     markersPublisher.publish(markers);
     //markersPublisher.publish(Markers);
     ros::spinOnce();
