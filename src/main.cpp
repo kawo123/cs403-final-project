@@ -87,8 +87,8 @@ const float Kinect_max_range = 10;
 //projector screen plane
 const Vector3f screenP0(0, 0, 0); // The screen is at the origin the kinect position should be relitive to the screen
 const Vector3f screenN(1, 0, 0);
-const float screenWidth = 1.5;
-const float screenHeight = 1.5;
+const float screenWidth = 1.3;
+const float screenHeight = 1;
 
 Vector3f kinectT;
 float kinectTheta;
@@ -288,7 +288,7 @@ void displayLines(const vector<struct line> lines){
 
 //
 Vector3f lineIntersectPlane(line line){
-    Rectangle screen = Rectangle(Vector3f(-screenWidth, -screenHeight, 0), Vector3f(screenWidth, -screenHeight, 0), Vector3f(screenWidth, screenHeight, 0), Vector3f(-screenWidth, screenHeight, 0));
+    Rectangle screen = Rectangle(Vector3f(0, -screenWidth, screenHeight), Vector3f(0, screenWidth, screenHeight), Vector3f(0, screenWidth, -screenHeight), Vector3f(0, -screenWidth, -screenHeight));
     displayScreen(screen);
     Vector3f intersection;
     intersection.x() = 0;   
@@ -302,28 +302,6 @@ Vector3f lineIntersectPlane(line line){
     }
     return intersection;
 }
-
-
-void FitMinimalCylindericalModel(const Vector3f& P1,
- const Vector3f& P2,
- const Vector3f& P3,
- const Vector3f& P4,
- const Vector3f& P5
- ){
-
-}
-
-void FitMinimalPlane(const Vector3f& avg,
- const Vector3f& P2,
- const Vector3f& P3,
- Vector3f* n,
- Vector3f* P0) {
-  *P0 = avg;
-  const Vector3f P21 = P2 - avg;
-  const Vector3f P31 = P3 - avg;
-  *n = (P21.cross(P31)).normalized();
-}
-
 
 struct line getBestFitLine(vector<Vector3f> point_cloud){
   struct line l;
@@ -668,7 +646,7 @@ int main(int argc, char **argv) {
   ros::Subscriber depth_image_subscriber =
   n.subscribe("/Cobot/Kinect/Depth", 1, DepthImageCallback);
   
-  ros::Rate loop_rate(10);
+  ros::Rate loop_rate(30);
 
   while(ros::ok()){
     markersPublisher.publish(markers);
