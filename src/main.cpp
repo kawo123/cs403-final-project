@@ -94,8 +94,9 @@ Vector3f kinectT;
 float kinectTheta;
 Matrix3f kinectR;
 
-vector<Line> map; 
+MarkerArray Markers;
 
+vector<Line> map; 
 
 vector<struct line> last_found_lines;
 
@@ -529,11 +530,18 @@ for(size_t i = 0; i < newfiltered_point_clouds.size(); ++i){
 }
 last_found_lines = lines;
 ROS_INFO("found %d lines", lines.size());
-  //vector<Vector3f> point_cloud_window = FSLF(point_cloud, &filtered_point_cloud);
 
-  // cout << filtered_point_cloud[0] << std::endl;
+ROS_INFO("markers size1: %lu", Markers.markers.size());
+Markers.markers.clear();
+ROS_INFO("markers size2: %lu", Markers.markers.size());
 
-  //use checkCylinder and getBestCylinder
+for (size_t i = 0; i < lines.size(); ++i){
+  DrawLine(Vector3f(0, 0, 0), lines[i].p0, &laser_marker);
+  Markers.markers.push_back(laser_marker);
+}
+ROS_INFO("markers size3: %lu", Markers.markers.size());
+markersPublisher.publish(Markers);
+ROS_INFO("markers size4: %lu", Markers.markers.size());
 
   // Publshing point cloud
 sensor_msgs::PointCloud point_cloud_msg;
@@ -574,6 +582,7 @@ ransacPublisher.publish(filtered_point_cloud_msg);
   }
   windowPublisher.publish(point_cloud_window_msg);*/
 
+  //markersPublisher.publish(Markers);
 }
 
 
@@ -589,7 +598,7 @@ int main(int argc, char **argv) {
   kinectR.row(1) <<         0,        1,        0;
   kinectR.row(2) <<-sin(kinectTheta), 0, cos(kinectTheta);
 
-  MarkerArray markers;
+  /*MarkerArray markers;
   markers.markers.clear();
 
   //test to see if displayScreen works
@@ -630,7 +639,7 @@ int main(int argc, char **argv) {
 
   markers.markers.push_back(screen_marker);
   markers.markers.push_back(laser_dot_marker);
-  markers.markers.push_back(laser_marker);
+  markers.markers.push_back(laser_marker);*/
 
 
   PointCloudPublisher = 
@@ -640,20 +649,21 @@ int main(int argc, char **argv) {
   windowPublisher = 
   n.advertise<sensor_msgs::PointCloud>("window_point_cloud", 1);
   markersPublisher = 
-  n.advertise<visualization_msgs::MarkerArray>("laser_pointer_simulation", 10);
+  n.advertise<visualization_msgs::MarkerArray>("laser_pointer_simulation", 1);
   
 
   ros::Subscriber depth_image_subscriber =
   n.subscribe("/Cobot/Kinect/Depth", 1, DepthImageCallback);
   //n.subscribe("/camera/depth/image_raw", 1, DepthImageCallback);
   
-  ros::Rate loop_rate(30);
+  ros::Rate loop_rate(10);
 
   while(ros::ok()){
+    MarkerArray markers;
     markersPublisher.publish(markers);
+    //markersPublisher.publish(Markers);
     ros::spinOnce();
     loop_rate.sleep();
-    
   }
 
 
