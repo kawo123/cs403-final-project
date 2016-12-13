@@ -355,9 +355,9 @@ bool RANSAC(vector<Vector3f> point_cloud, vector<Vector3f>* filtered_point_cloud
 
   vector<Vector3f> inliers; 
   float best_inlier_fraction = 0;
-  float dist_epsilon = 0.06;
+  float dist_epsilon = 0.08;
   float inlier_fraction = 0.0; 
-  float min_inlier_fraction = 0.55;
+  float min_inlier_fraction = 0.45;
 
 
   // RANSAC for line
@@ -404,28 +404,29 @@ vector<Vector3f> getWindow(const vector<Vector3f> point_cloud,
 return window;
 }
 
-void FSLF(vector<Vector3f> point_cloud, 
-  unsigned int n, 
-  unsigned int k,
-  float window_size, 
-  const vector<struct line> old_lines,    
-  vector< vector<Vector3f> >* filtered_point_clouds, 
-  vector<struct line>* valid_lines){ 
+void FSLF(vector<Vector3f> point_cloud,
+          vector<Vector3f> sample_point_cloud, 
+          unsigned int n, 
+          unsigned int k,
+          float window_size, 
+          const vector<struct line> old_lines,    
+          vector< vector<Vector3f> >* filtered_point_clouds, 
+          vector<struct line>* valid_lines){ 
 
-  if (point_cloud.size() == 0){
+  if (point_cloud.size() == 0 || sample_point_cloud.size() == 0){
     return;
   }
 
   vector< vector<Vector3f> > inlier_point_clouds;
   vector<struct line> lines; 
   unsigned int minWindowpoints = 100;
-  float safetyDist = 2;
+  float safetyDist = 0.7;
 
   do{
     Vector3f p;
     bool pIsValid = false;
     while (!pIsValid && k > 0){
-      p = point_cloud[rand() % point_cloud.size()];
+      p = sample_point_cloud[rand() % sample_point_cloud.size()];
       pIsValid = true;
       for(size_t i = 0; i < old_lines.size(); ++i){
         if ((old_lines[i].p0 - p).norm() < safetyDist){
@@ -448,7 +449,7 @@ void FSLF(vector<Vector3f> point_cloud,
       float centered_window_percent_inliers = ((float)filtered_point_cloud.size())/((float)getWindow(point_cloud, newLine.p0, window_size).size());
       ROS_INFO("centered percent inliers: %f", centered_window_percent_inliers);
 
-      if (centered_window_percent_inliers >= 0.55){
+      if (centered_window_percent_inliers >= 0.45){
         inlier_point_clouds.push_back(filtered_point_cloud);
         lines.push_back(newLine);
       }
@@ -517,7 +518,7 @@ vector< vector<Vector3f> > newfiltered_point_clouds;
 vector<struct line> newlines;
 
 for (size_t i = 0; i < last_found_lines.size(); ++i){
-  FSLF(getWindow(point_cloud, last_found_lines[i].p0, 1), 1, 8, 0.8, lines, &newfiltered_point_clouds, &newlines);
+  FSLF(point_cloud, getWindow(point_cloud, last_found_lines[i].p0, 0.5), 1, 15, 0.7, lines, &newfiltered_point_clouds, &newlines);
   for(size_t i = 0; i < newlines.size(); ++i){
     lines.push_back(newlines[i]);
   }
@@ -526,7 +527,7 @@ for (size_t i = 0; i < last_found_lines.size(); ++i){
   }
 }
 
-FSLF(point_cloud, 1, 40, 0.8, lines, &newfiltered_point_clouds, &newlines);
+FSLF(point_cloud, point_cloud, 1, 40, 0.8, lines, &newfiltered_point_clouds, &newlines);
 for(size_t i = 0; i < newlines.size(); ++i){
   lines.push_back(newlines[i]);
 }
