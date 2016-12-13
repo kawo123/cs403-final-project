@@ -416,92 +416,51 @@ void FSLF(vector<Vector3f> point_cloud,
     return;
   }
 
-  printf("0\n");
   vector< vector<Vector3f> > inlier_point_clouds;
   vector<struct line> lines; 
   unsigned int minWindowpoints = 100;
   float safetyDist = 2;
-  printf("1\n");
 
-  //temp
-  //window_size = 0.5;
-  //n = 2;
-  //k = 40;
+  do{
+    Vector3f p;
+    bool pIsValid = false;
+    while (!pIsValid && k > 0){
+      p = point_cloud[rand() % point_cloud.size()];
+      pIsValid = true;
+      for(size_t i = 0; i < old_lines.size(); ++i){
+        if ((old_lines[i].p0 - p).norm() < safetyDist){
+          pIsValid = false;
+          --k;
+          break;
+        }
+      }
+    }
+    if (k <= 0){
+      break;
+    }
+    vector<Vector3f> point_cloud_window = getWindow(point_cloud, p, window_size);
 
-  /*for (size_t i = 0; i < last_found_lines.size(); ++i){
-  	vector<Vector3f> point_cloud_window = getWindow(point_cloud, last_found_lines[i].p0, window_size);
-  	ROS_INFO("starting ransac");
+    ROS_INFO("starting ransac");
     vector<Vector3f> filtered_point_cloud;
     if (RANSAC(point_cloud_window, &filtered_point_cloud)){
       ROS_INFO("found a line");
-      inlier_point_clouds.push_back(filtered_point_cloud);
-      lines.push_back(getBestFitLine(filtered_point_cloud));
+      struct line newLine = getBestFitLine(filtered_point_cloud);
+      float centered_window_percent_inliers = ((float)filtered_point_cloud.size())/((float)getWindow(point_cloud, newLine.p0, window_size).size());
+      ROS_INFO("centered percent inliers: %f", centered_window_percent_inliers);
+
+      if (centered_window_percent_inliers >= 0.55){
+        inlier_point_clouds.push_back(filtered_point_cloud);
+        lines.push_back(newLine);
+      }
+    
       if (inlier_point_clouds.size() > n - 1){
-      	break;
+        break;
       }
     }
-    k--;
-  }*/
-
-  do{
-  	/*vector<Vector3f> point_cloud_window;
-  	unsigned int count = 0;
-  	do {
-     count++;
-     Vector3f p = point_cloud[rand() % point_cloud.size()];
-     point_cloud_window = getWindow(point_cloud, p, window_size);
-     ROS_INFO("point_cloud_window.size(): %d", point_cloud_window.size());
-     if (count > k){
-       break;
-     }
-   }while(point_cloud_window.size() < minWindowpoints);*/
-
-   Vector3f p;
-   bool pIsValid = false;
-   printf("2\n");
-   while (!pIsValid && k > 0){
-     p = point_cloud[rand() % point_cloud.size()];
-     pIsValid = true;
-     for(size_t i = 0; i < old_lines.size(); ++i){
-       if ((old_lines[i].p0 - p).norm() < safetyDist){
-         pIsValid = false;
-         --k;
-         break;
-       }
-     }
-     printf("done with lines\n");
-   }
-   printf("3\n");
-   if (k <= 0){
-     break;
-   }
-   vector<Vector3f> point_cloud_window = getWindow(point_cloud, p, window_size);
-
-   //Vector3f p = point_cloud[rand() % point_cloud.size()];
-   //vector<Vector3f> point_cloud_window = getWindow(point_cloud, p, window_size);
-
-   ROS_INFO("starting ransac");
-   vector<Vector3f> filtered_point_cloud;
-   if (RANSAC(point_cloud_window, &filtered_point_cloud)){
-    ROS_INFO("found a line");
-    struct line newLine = getBestFitLine(filtered_point_cloud);
-    float centered_window_percent_inliers = ((float)filtered_point_cloud.size())/((float)getWindow(point_cloud, newLine.p0, window_size).size());
-    ROS_INFO("centered percent inliers: %f", centered_window_percent_inliers);
-
-    if (centered_window_percent_inliers >= 0.55){
-      inlier_point_clouds.push_back(filtered_point_cloud);
-      lines.push_back(newLine);
-    }
-    
-    if (inlier_point_clouds.size() > n - 1){
-     break;
-   }
- }
- k--;
-}while(k > 0);
-*filtered_point_clouds = inlier_point_clouds; 
-*valid_lines = lines;
-printf("4\n");
+  k--;
+  }while(k > 0);
+  *filtered_point_clouds = inlier_point_clouds; 
+  *valid_lines = lines;
 }
 
 void DepthImageCallback(const sensor_msgs::Image& depth_image){
