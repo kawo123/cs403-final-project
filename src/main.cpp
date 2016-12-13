@@ -600,6 +600,15 @@ int main(int argc, char **argv) {
   MarkerArray markers;
   markers.markers.clear();
   displayScreen();
+  //vector<struct line> lines
+  vector<line> lines;
+  line lineOne;
+  Vector3f p0test(0,0,0);
+  Vector3f ltest(1.5, 0, 1.5);
+  lineOne.l = ltest;
+  lineOne.p0 = p0test;
+  lines.push_back(lineOne);
+  displayLines(lines);
   markers.markers.push_back(screen_marker);
   markers.markers.push_back(laser_dot_marker);
   markers.markers.push_back(laser_marker);
