@@ -111,7 +111,7 @@ Marker laser_dot_marker;
 
 // Initialize all markers.
 void InitMarkers() {
-  screen_marker.header.frame_id = "kinect_0";
+  screen_marker.header.frame_id = "kinect_0";//"camera_depth_optical_frame";
   screen_marker.id = 1;
   screen_marker.type = Marker::LINE_LIST;
   screen_marker.action = Marker::MODIFY;
@@ -122,7 +122,7 @@ void InitMarkers() {
   screen_marker.color.g = 1.0;
   screen_marker.color.b = 0.0;
 
-  laser_marker.header.frame_id = "kinect_0";
+  laser_marker.header.frame_id = "kinect_0";//"camera_depth_optical_frame";
   laser_marker.id = 2;
   laser_marker.type = Marker::LINE_LIST;
   laser_marker.action = Marker::MODIFY;
@@ -134,7 +134,7 @@ void InitMarkers() {
   laser_marker.color.b = 0.0;
 
 
-  laser_dot_marker.header.frame_id = "kinect_0";
+  laser_dot_marker.header.frame_id = "kinect_0";//"camera_depth_optical_frame";
   laser_dot_marker.id = 3;
   laser_dot_marker.type = Marker::POINTS;
   laser_dot_marker.action = Marker::MODIFY;
@@ -511,7 +511,7 @@ vector< vector<Vector3f> > newfiltered_point_clouds;
 vector<struct line> newlines;
 
 for (size_t i = 0; i < last_found_lines.size(); ++i){
-  FSLF(point_cloud, getWindow(point_cloud, last_found_lines[i].p0, 0.5), 1, 15, 0.7, lines, &newfiltered_point_clouds, &newlines);
+  FSLF(point_cloud, getWindow(point_cloud, last_found_lines[i].p0, 0.25), 1, 15, 0.7, lines, &newfiltered_point_clouds, &newlines);
   for(size_t i = 0; i < newlines.size(); ++i){
     lines.push_back(newlines[i]);
   }
@@ -645,6 +645,7 @@ int main(int argc, char **argv) {
 
   ros::Subscriber depth_image_subscriber =
   n.subscribe("/Cobot/Kinect/Depth", 1, DepthImageCallback);
+  //n.subscribe("/camera/depth/image_raw", 1, DepthImageCallback);
   
   ros::Rate loop_rate(30);
 
