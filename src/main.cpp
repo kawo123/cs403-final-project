@@ -220,10 +220,15 @@ void ClearMarker(Marker* marker){
     return sqrt(pow(diffX, 2) + pow(diffY, 2) + pow(diffZ, 2));
   }
 
-// checks if the given line intersects with the screen's plane
-// returns true if it is valid and false otherwize
-bool checkLine(line line, Rectangle screen, Vector3f *intersection){
-  //source : https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection
+bool checkLine(line line){
+  if (line.pScreen.y() < -screenWidth/2 || 
+      line.pScreen.y() > screenWidth/2 || 
+      line.pScreen.z() < -screenHeight/2 || 
+      line.pScreen.z() > screenHeight/2){
+    return false;
+  }
+  return true;
+  /*//source : https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection
   //n is normal of e1 and e2
   Vector3f e2 = screen.topright - screen.topleft;
   Vector3f e1 = screen.bottomleft - screen.topleft;
@@ -260,7 +265,7 @@ bool checkLine(line line, Rectangle screen, Vector3f *intersection){
     return true;
   }
   ROS_INFO("does not intersect the plane");
-  return false;
+  return false;*/
 }
 
 
