@@ -214,7 +214,7 @@ void ClearMarker(Marker* marker){
 
 // checks if the given line intersects with the screen's plane
 // returns true if it is valid and false otherwize
-bool checkLine(line line, Rectangle screen, Vector3f *intersection){
+bool checkLine(line line, Rectangle screen, Vector3f *intersectionfinal){
   //source : https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection
   //n is normal of e1 and e2
   Vector3f e2 = screen.topright - screen.topleft;
@@ -224,6 +224,10 @@ bool checkLine(line line, Rectangle screen, Vector3f *intersection){
   //lineldotnormal is to see if the line and normal are perpendicular. if they are, the line is parallel to the screen
   float lineldotnormal = line.l.dot(normal);
   if(lineldotnormal == 0){
+  	cout << "\ne1:\n" << e1;
+  	cout << "\ne2:\n" << e2;
+  	cout << "\nnormal:\n" << normal;
+  	cout << "\ndot product:\n" << lineldotnormal;
     ROS_INFO("the line is parallel to the screen");
     return false;
   }
@@ -245,10 +249,21 @@ bool checkLine(line line, Rectangle screen, Vector3f *intersection){
   float P1P0dotnormal = P1P0.dot(normal);
   float t = -(P1P0dotnormal) / lineldotnormal;
 
-  *intersection = P1 + (t * (line.l));
+  Vector3f intersection;
+  intersection = P1 + (t * (line.l));
+
   //topleft, topright, bottomright, bottomleft
-  if(intersection->x() <= screenWidth && intersection->x() >= -screenWidth && intersection->y() <= screenHeight && intersection->y() >= -screenHeight){
-    ROS_INFO("intersects the plane");
+
+  if(intersection.x() < screenWidth && intersection.x() > -(screenWidth) && intersection.y() < screenHeight && intersection.y() > -(screenHeight)){
+    cout << "x: " << intersection.x() << "\ny: " << intersection.y() << "\nz: " << intersection.z();
+
+    cout << "\nscreenWidth: " << (-screenWidth); 
+    cout << "\nscreenHeight: " << (-screenHeight); 
+
+    ROS_INFO("\nintersects the plane...\n");
+
+    *intersectionfinal = intersection;
+    //ROS_INFO(intersection->x());
     return true;
   }
   ROS_INFO("does not intersect the plane");
@@ -273,13 +288,12 @@ void displayScreen(Rectangle screen){
 }
 
 //displays the laser points and pushes to laser dot markers
-void displayPoints(const vector<Vector3f> laserpointers){
+void displayPoints(const vector<Vector3f> laserpointers, vector<bool> isIntersect){
   for(size_t i = 0; i<laserpointers.size(); ++i){
-    if(laserpointers[i].x() == 0 && laserpointers[i].y() == 0 && laserpointers[i].z() == 0 ){
-      ROS_INFO("Did not intersect line, so will not displayPoint");
+    if(!isIntersect[i]){
+      ROS_INFO("Since did not have intersection point, will not display point");
     }else{
       DrawPoint(laserpointers[i], &laser_dot_marker);
-
     }
   }
 }
@@ -293,7 +307,7 @@ void displayLines(const vector<struct line> lines){
 
 
 //
-Vector3f lineIntersectPlane(line line){
+Vector3f lineIntersectPlane(line line, bool *intersectbool){
     Rectangle screen = Rectangle(Vector3f(0, -screenWidth, screenHeight), Vector3f(0, screenWidth, screenHeight), Vector3f(0, screenWidth, -screenHeight), Vector3f(0, -screenWidth, -screenHeight));
     displayScreen(screen);
     Vector3f intersection;
@@ -303,8 +317,8 @@ Vector3f lineIntersectPlane(line line){
     //return the Point
     //else returns the origin (could be Point anywhere; I just made intersection at (0,0,0) because I 
     //just want to show that the line doesn't intersect with plane)
-    if(!checkLine(line, screen, &intersection)){
-      ROS_INFO("Does not insect with plane");
+    if(checkLine(line, screen, &intersection)){
+	  *intersectbool = true;
     }
     return intersection;
 }
@@ -622,7 +636,7 @@ int main(int argc, char **argv) {
   kinectR.row(1) <<         0,        1,        0;
   kinectR.row(2) <<-sin(kinectTheta), 0, cos(kinectTheta);
 
-  /*MarkerArray markers;
+  MarkerArray markers;
   markers.markers.clear();
 
   //test to see if displayScreen works
@@ -632,8 +646,8 @@ int main(int argc, char **argv) {
   //test to see if displayLines works
   vector<line> lines;
   line lineOne;
-  Vector3f p0test(0.5,0.5,.5);
-  Vector3f ltest(1.3, 1, 1.5);
+  Vector3f p0test(1,0,0);
+  Vector3f ltest(0, 0, .75);
   lineOne.l = ltest;
   lineOne.p0 = p0test;
   lines.push_back(lineOne);
@@ -641,29 +655,30 @@ int main(int argc, char **argv) {
 
   //test to see if displayPoints work
   //const vector<Vector3f> laserpointers
-  vector<Vector3f> laserpointers;
-  Vector3f pointTest(1,0,0);
-  laserpointers.push_back(pointTest);
-  displayPoints(laserpointers);
+  //vector<Vector3f> laserpointers;
+  //Vector3f pointTest(1,0,0);
+  //laserpointers.push_back(pointTest);
+  //displayPoints(laserpointers);
 
   //test to see if checkLine is right
   //line line, Rectangle screen, Vector3f *intersection
   //lineIntersectPlane(line line) returns Vector3f intersection
   vector<Vector3f> intersectionpoints;
+  vector<bool> isIntersect;
   for(size_t i = 0; i<lines.size(); ++i){
+  	cout << "line.p0:\n" << lines[i].p0 << "line.l\n" << lines[i].l;
     Vector3f intersectionpt;
-    intersectionpt.x() = 0;
-    intersectionpt.y() = 0;
-    intersectionpt.z() = 0;
-    intersectionpt = lineIntersectPlane(lines[i]);
+    bool intersectbool = false;
+    intersectionpt = lineIntersectPlane(lines[i], &intersectbool);
     intersectionpoints.push_back(intersectionpt);
+    isIntersect.push_back(intersectbool);
   }
-    displayPoints(intersectionpoints);
+    displayPoints(intersectionpoints, isIntersect);
 
 
   markers.markers.push_back(screen_marker);
   markers.markers.push_back(laser_dot_marker);
-  markers.markers.push_back(laser_marker);*/
+  markers.markers.push_back(laser_marker);
 
 
   PointCloudPublisher = 
