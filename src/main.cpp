@@ -706,7 +706,7 @@ int main(int argc, char **argv) {
   kinectR.row(1) <<         0,        1,        0;
   kinectR.row(2) <<-sin(kinectTheta), 0, cos(kinectTheta);
 
-  MarkerArray markers;
+  /*MarkerArray markers;
   markers.markers.clear();
 
   //test to see if displayScreen works
@@ -748,7 +748,7 @@ int main(int argc, char **argv) {
 
   markers.markers.push_back(screen_marker);
   markers.markers.push_back(laser_dot_marker);
-  markers.markers.push_back(laser_marker);
+  markers.markers.push_back(laser_marker);*/
 
 
   PointCloudPublisher = 
