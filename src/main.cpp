@@ -60,18 +60,11 @@ struct Line{ //this is Line struct for displaying the screen only
   }
 }; 
 
-
-struct cylinder
-{
-  Vector3f p0;
-  Vector3f l;
-  float r;
-};
-
 struct line
 {
   Vector3f p0;
   Vector3f l;
+  unsigned int id;
 };
 
 
@@ -93,6 +86,7 @@ const float screenWidth = 1.3;
 const float screenHeight = 1;
 
 const unsigned int maxLines = 10;
+bool lineIDs[maxLines];
 
 Vector3f kinectT;
 float kinectTheta;
@@ -113,6 +107,12 @@ ros::Publisher windowPublisher;
 Marker screen_marker;
 Marker laser_marker;
 Marker laser_dot_marker;
+
+void initLineIDs(){
+  for (size_t i = 0; i < maxLines; ++i){
+    lineIDs[i] = false;
+  }
+}
 
 // Initialize all markers.
 void InitMarkers() {
@@ -505,6 +505,16 @@ void FSLF(vector<Vector3f> point_cloud,
   *valid_lines = lines;
 }
 
+unsigned int getNewLineID(){
+  for (unsigned int i = 0; i < maxLines; ++i){
+    if (lineIDs[i] == false){
+      lineIDs[i] = true;
+      return i;
+    }
+  }
+  return 0;
+}
+
 void DepthImageCallback(const sensor_msgs::Image& depth_image){
 	vector<Vector3f> temp_point_cloud;
 	int count = 10;
@@ -559,17 +569,24 @@ vector< vector<Vector3f> > newfiltered_point_clouds;
 vector<struct line> newlines;
 
 for (size_t i = 0; i < last_found_lines.size(); ++i){
-  FSLF(point_cloud, getWindow(point_cloud, last_found_lines[i].p0, 0.15), 1, 15, 0.7, lines, &newfiltered_point_clouds, &newlines);
-  for(size_t i = 0; i < newlines.size(); ++i){
-    lines.push_back(newlines[i]);
+  FSLF(point_cloud, getWindow(point_cloud, last_found_lines[i].p0, 0.15), 1, 20, 0.7, lines, &newfiltered_point_clouds, &newlines);
+  if (newlines.size() > 0){
+    for(size_t j = 0; j < newlines.size(); ++j){
+      newlines[j].id = last_found_lines[i].id;
+      lines.push_back(newlines[j]);
+    }
+    for(size_t j = 0; j < newfiltered_point_clouds.size(); ++j){
+      filtered_point_clouds.push_back(newfiltered_point_clouds[j]);
+    }
   }
-  for(size_t i = 0; i < newfiltered_point_clouds.size(); ++i){
-    filtered_point_clouds.push_back(newfiltered_point_clouds[i]);
+  else {
+    lineIDs[last_found_lines[i].id] = false;
   }
 }
 
 FSLF(point_cloud, point_cloud, maxLines - lines.size(), 40, 0.7, lines, &newfiltered_point_clouds, &newlines);
 for(size_t i = 0; i < newlines.size(); ++i){
+  newlines[i].id = getNewLineID();
   lines.push_back(newlines[i]);
 }
 for(size_t i = 0; i < newfiltered_point_clouds.size(); ++i){
@@ -577,6 +594,10 @@ for(size_t i = 0; i < newfiltered_point_clouds.size(); ++i){
 }
 last_found_lines = lines;
 ROS_INFO("found %d lines", lines.size());
+
+for (size_t i = 0; i < lines.size(); ++i){
+  ROS_INFO("line: %lu, id: %u", i + 1, lines[i].id);
+}
 
 ClearMarker(&laser_marker);
 for (size_t i = 0; i < lines.size(); ++i){
@@ -628,6 +649,7 @@ ransacPublisher.publish(filtered_point_cloud_msg);
 
 int main(int argc, char **argv) {
   InitMarkers();
+  initLineIDs();
   ros::init(argc, argv, "compsci403_final");
   ros::NodeHandle n;
   kinectT << 0.0, 0.0, screenHeight/2;
