@@ -60,18 +60,17 @@ struct Line{ //this is Line struct for displaying the screen only
   }
 }; 
 
-
-struct cylinder
-{
-  Vector3f p0;
-  Vector3f l;
-  float r;
-};
-
 struct line
 {
+  //the actual line
   Vector3f p0;
   Vector3f l;
+
+  //unique id for color assignment
+  unsigned int id;
+
+  //point of intersection with screen
+  Vector3f pScreen;
 };
 
 
@@ -92,6 +91,9 @@ const Vector3f screenN(1, 0, 0);
 const float screenWidth = 1.3;
 const float screenHeight = 1;
 
+const unsigned int maxLines = 10;
+bool lineIDs[maxLines];
+
 Vector3f kinectT;
 float kinectTheta;
 Matrix3f kinectR;
@@ -111,6 +113,12 @@ ros::Publisher windowPublisher;
 Marker screen_marker;
 Marker laser_marker;
 Marker laser_dot_marker;
+
+void initLineIDs(){
+  for (size_t i = 0; i < maxLines; ++i){
+    lineIDs[i] = false;
+  }
+}
 
 // Initialize all markers.
 void InitMarkers() {
@@ -214,7 +222,7 @@ void ClearMarker(Marker* marker){
 
 // checks if the given line intersects with the screen's plane
 // returns true if it is valid and false otherwize
-bool checkLine(line line, Rectangle screen, Vector3f *intersectionfinal){
+bool checkLine(line line, Rectangle screen, Vector3f *intersection){
   //source : https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection
   //n is normal of e1 and e2
   Vector3f e2 = screen.topright - screen.topleft;
@@ -224,10 +232,6 @@ bool checkLine(line line, Rectangle screen, Vector3f *intersectionfinal){
   //lineldotnormal is to see if the line and normal are perpendicular. if they are, the line is parallel to the screen
   float lineldotnormal = line.l.dot(normal);
   if(lineldotnormal == 0){
-  	cout << "\ne1:\n" << e1;
-  	cout << "\ne2:\n" << e2;
-  	cout << "\nnormal:\n" << normal;
-  	cout << "\ndot product:\n" << lineldotnormal;
     ROS_INFO("the line is parallel to the screen");
     return false;
   }
@@ -249,21 +253,10 @@ bool checkLine(line line, Rectangle screen, Vector3f *intersectionfinal){
   float P1P0dotnormal = P1P0.dot(normal);
   float t = -(P1P0dotnormal) / lineldotnormal;
 
-  Vector3f intersection;
-  intersection = P1 + (t * (line.l));
-
+  *intersection = P1 + (t * (line.l));
   //topleft, topright, bottomright, bottomleft
-
-  if(intersection.x() < screenWidth && intersection.x() > -(screenWidth) && intersection.y() < screenHeight && intersection.y() > -(screenHeight)){
-    cout << "x: " << intersection.x() << "\ny: " << intersection.y() << "\nz: " << intersection.z();
-
-    cout << "\nscreenWidth: " << (-screenWidth); 
-    cout << "\nscreenHeight: " << (-screenHeight); 
-
-    ROS_INFO("\nintersects the plane...\n");
-
-    *intersectionfinal = intersection;
-    //ROS_INFO(intersection->x());
+  if(intersection->x() <= screenWidth && intersection->x() >= -screenWidth && intersection->y() <= screenHeight && intersection->y() >= -screenHeight){
+    ROS_INFO("intersects the plane");
     return true;
   }
   ROS_INFO("does not intersect the plane");
@@ -272,28 +265,35 @@ bool checkLine(line line, Rectangle screen, Vector3f *intersectionfinal){
 
 
 // displays the bounding lines  of the screen on a map of Lines
-void displayScreen(Rectangle screen){
-  map.push_back(Line(screen.topleft, screen.topright)); 
+void displayScreen(){
+  /* map.push_back(Line(screen.topleft, screen.topright)); 
   map.push_back(Line(screen.topright, screen.bottomright)); 
   map.push_back(Line(screen.bottomright, screen.bottomleft)); 
   map.push_back(Line(screen.bottomleft, screen.topleft)); 
 
-
-
   for(size_t i = 0; i<map.size(); ++i){
     DrawLine(map[i].p1,map[i].p2, &screen_marker);
-  }
-
-
+  }*/
+  ClearMarker(&screen_marker);
+  //from prespective of facing screen
+  Vector3f topleft(0, -screenWidth/2, screenHeight/2);
+  Vector3f topright(0, screenWidth/2, screenHeight/2);
+  Vector3f bottomright(0, screenWidth/2, -screenHeight/2);
+  Vector3f bottomleft(0, -screenWidth/2, -screenHeight/2);
+  DrawLine(topleft, topright, &screen_marker);
+  DrawLine(topright, bottomright, &screen_marker);
+  DrawLine(bottomright, bottomleft, &screen_marker);
+  DrawLine(bottomleft, topleft, &screen_marker);
 }
 
 //displays the laser points and pushes to laser dot markers
-void displayPoints(const vector<Vector3f> laserpointers, vector<bool> isIntersect){
+void displayPoints(const vector<Vector3f> laserpointers){
   for(size_t i = 0; i<laserpointers.size(); ++i){
-    if(!isIntersect[i]){
-      ROS_INFO("Since did not have intersection point, will not display point");
+    if(laserpointers[i].x() == 0 && laserpointers[i].y() == 0 && laserpointers[i].z() == 0 ){
+      ROS_INFO("Did not intersect line, so will not displayPoint");
     }else{
       DrawPoint(laserpointers[i], &laser_dot_marker);
+
     }
   }
 }
@@ -307,8 +307,8 @@ void displayLines(const vector<struct line> lines){
 
 
 //
-Vector3f lineIntersectPlane(line line, bool *intersectbool){
-    Rectangle screen = Rectangle(Vector3f(0, -screenWidth, screenHeight), Vector3f(0, screenWidth, screenHeight), Vector3f(0, screenWidth, -screenHeight), Vector3f(0, -screenWidth, -screenHeight));
+bool lineIntersectPlane(line* l){
+    /*Rectangle screen = Rectangle(Vector3f(0, -screenWidth, screenHeight), Vector3f(0, screenWidth, screenHeight), Vector3f(0, screenWidth, -screenHeight), Vector3f(0, -screenWidth, -screenHeight));
     displayScreen(screen);
     Vector3f intersection;
     intersection.x() = 0;   
@@ -317,10 +317,18 @@ Vector3f lineIntersectPlane(line line, bool *intersectbool){
     //return the Point
     //else returns the origin (could be Point anywhere; I just made intersection at (0,0,0) because I 
     //just want to show that the line doesn't intersect with plane)
-    if(checkLine(line, screen, &intersection)){
-	  *intersectbool = true;
+    if(!checkLine(line, screen, &intersection)){
+      ROS_INFO("Does not insect with plane");
     }
-    return intersection;
+    return intersection;*/
+  float det = (l->l.dot(screenN));
+  if (det == 0){
+    return false;
+  }
+
+  float d = ((screenP0 - l->p0).dot(screenN))/det;
+  l->pScreen = d*(l->l) + (l->p0);
+  return true;
 }
 
 struct line getBestFitLine(vector<Vector3f> point_cloud){
@@ -339,7 +347,9 @@ struct line getBestFitLine(vector<Vector3f> point_cloud){
 
   MatrixXf M(point_cloud.size(), 3);
   for (size_t i = 0; i < point_cloud.size(); ++i){
-    M.row(i) = point_cloud[i];
+    M(i, 0) = point_cloud[i](0) - l.p0(0);
+    M(i, 1) = point_cloud[i](1) - l.p0(1);
+    M(i, 2) = point_cloud[i](2) - l.p0(2);
   }
 
   Matrix3f A = M.transpose()*M;
@@ -350,19 +360,20 @@ struct line getBestFitLine(vector<Vector3f> point_cloud){
   Vector3f eigen_values = eigen_solver.eigenvalues().real();
   Matrix3f eigen_vectors = eigen_solver.eigenvectors().real();
 
-  int null_space_iVector = 0;
-  int smallest_eigen_value = fabs(eigen_values(null_space_iVector));
+  int index_iVector = 0;
+  float largest_eigen_value = fabs(eigen_values(index_iVector));
 
-  for (size_t i = 1; i < 3; ++i){
-    int new_eigen_value = fabs(eigen_values(i));
-    if (new_eigen_value < smallest_eigen_value){
-      null_space_iVector = i;
-      smallest_eigen_value = new_eigen_value;
+  for (size_t i = 0; i < 3; ++i){
+    float new_eigen_value = fabs(eigen_values(i));
+    ROS_INFO("eigen val: %f", eigen_values(i));
+    if (new_eigen_value > largest_eigen_value){
+      index_iVector = i;
+      largest_eigen_value = new_eigen_value;
     }
   }
+  ROS_INFO("largest_eigen_value: %f", largest_eigen_value);
 
-  l.l = eigen_vectors.col(null_space_iVector);
-
+  l.l = eigen_vectors.col(index_iVector);
 
   return l;
 }
@@ -417,7 +428,7 @@ bool RANSAC(vector<Vector3f> point_cloud, vector<Vector3f>* filtered_point_cloud
     }
   }
   if (best_inlier_fraction == 0){
-  	return false;
+    return false;
   }
   printf("In RANSAC: the best inlier_fraction is %f\n", best_inlier_fraction);
   *filtered_point_cloud = inliers;
@@ -436,9 +447,9 @@ vector<Vector3f> getWindow(const vector<Vector3f> point_cloud,
   const float Zmax = p.z() + w;
   const float Zmin = p.z() - w;
   for (size_t i = 0; i < point_cloud.size(); ++i){
-  	if (point_cloud[i].x() > Xmin && point_cloud[i].x() < Xmax 
-  		&& point_cloud[i].y() > Ymin && point_cloud[i].y() < Ymax
-  		&& point_cloud[i].z() > Zmin && point_cloud[i].z() < Zmax){
+    if (point_cloud[i].x() > Xmin && point_cloud[i].x() < Xmax 
+      && point_cloud[i].y() > Ymin && point_cloud[i].y() < Ymax
+      && point_cloud[i].z() > Zmin && point_cloud[i].z() < Zmax){
      window.push_back(point_cloud[i]);
  }
 }
@@ -476,13 +487,21 @@ void FSLF(vector<Vector3f> point_cloud,
           break;
         }
       }
+      if (pIsValid){
+        for(size_t i = 0; i < lines.size(); ++i){
+          if ((lines[i].p0 - p).norm() < safetyDist){
+            pIsValid = false;
+            --k;
+            break;
+          }
+        }
+      }
     }
     if (k <= 0){
       break;
     }
     vector<Vector3f> point_cloud_window = getWindow(point_cloud, p, window_size);
 
-    ROS_INFO("starting ransac");
     vector<Vector3f> filtered_point_cloud;
     if (RANSAC(point_cloud_window, &filtered_point_cloud)){
       ROS_INFO("found a line");
@@ -492,6 +511,7 @@ void FSLF(vector<Vector3f> point_cloud,
 
       if (centered_window_percent_inliers >= 0.45){
         inlier_point_clouds.push_back(filtered_point_cloud);
+        lineIntersectPlane(&newLine);
         lines.push_back(newLine);
       }
     
@@ -505,16 +525,26 @@ void FSLF(vector<Vector3f> point_cloud,
   *valid_lines = lines;
 }
 
+unsigned int getNewLineID(){
+  for (unsigned int i = 0; i < maxLines; ++i){
+    if (lineIDs[i] == false){
+      lineIDs[i] = true;
+      return i;
+    }
+  }
+  return 0;
+}
+
 void DepthImageCallback(const sensor_msgs::Image& depth_image){
-	vector<Vector3f> temp_point_cloud;
-	int count = 10;
+  vector<Vector3f> temp_point_cloud;
+  int count = 10;
 
     // Setting random seed
   srand(time(NULL)); 
 
   for (unsigned int y = 0; y < depth_image.height; ++y) {
     for (unsigned int x = 0; x < depth_image.width; ++x) {
-      	// Add code here to only process only every nth pixel
+        // Add code here to only process only every nth pixel
      if(count <= 0){
       uint16_t byte0 = depth_image.data[2 * (x + y * depth_image.width) + 0];
       uint16_t byte1 = depth_image.data[2 * (x + y * depth_image.width) + 1];
@@ -542,7 +572,7 @@ for (size_t i = 0; i < temp_point_cloud.size(); ++i){
  Vector3f P(temp_point_cloud[i].z(), -temp_point_cloud[i].x(), temp_point_cloud[i].y());
  float P_range = sqrt(P.x()*P.x() + P.y()*P.y());
  if (P_range < Kinect_max_range && P_range > Kinect_min_range){
-	  	//P = kinectR*P + kinectT; //rotate the kinect image
+      //P = kinectR*P + kinectT; //rotate the kinect image
    point_cloud.push_back(P);
  }
 }
@@ -559,17 +589,24 @@ vector< vector<Vector3f> > newfiltered_point_clouds;
 vector<struct line> newlines;
 
 for (size_t i = 0; i < last_found_lines.size(); ++i){
-  FSLF(point_cloud, getWindow(point_cloud, last_found_lines[i].p0, 0.25), 1, 15, 0.7, lines, &newfiltered_point_clouds, &newlines);
-  for(size_t i = 0; i < newlines.size(); ++i){
-    lines.push_back(newlines[i]);
+  FSLF(point_cloud, getWindow(point_cloud, last_found_lines[i].p0, 0.15), 1, 20, 0.7, lines, &newfiltered_point_clouds, &newlines);
+  if (newlines.size() > 0){
+    for(size_t j = 0; j < newlines.size(); ++j){
+      newlines[j].id = last_found_lines[i].id;
+      lines.push_back(newlines[j]);
+    }
+    for(size_t j = 0; j < newfiltered_point_clouds.size(); ++j){
+      filtered_point_clouds.push_back(newfiltered_point_clouds[j]);
+    }
   }
-  for(size_t i = 0; i < newfiltered_point_clouds.size(); ++i){
-    filtered_point_clouds.push_back(newfiltered_point_clouds[i]);
+  else {
+    lineIDs[last_found_lines[i].id] = false;
   }
 }
 
-FSLF(point_cloud, point_cloud, 1, 40, 0.8, lines, &newfiltered_point_clouds, &newlines);
+FSLF(point_cloud, point_cloud, maxLines - lines.size(), 40, 0.7, lines, &newfiltered_point_clouds, &newlines);
 for(size_t i = 0; i < newlines.size(); ++i){
+  newlines[i].id = getNewLineID();
   lines.push_back(newlines[i]);
 }
 for(size_t i = 0; i < newfiltered_point_clouds.size(); ++i){
@@ -578,9 +615,15 @@ for(size_t i = 0; i < newfiltered_point_clouds.size(); ++i){
 last_found_lines = lines;
 ROS_INFO("found %d lines", lines.size());
 
-ClearMarker(&laser_marker);
 for (size_t i = 0; i < lines.size(); ++i){
-  DrawLine(lines[i].p0, lines[i].l + lines[i].p0, &laser_marker);
+  ROS_INFO("line: %lu, id: %u", i + 1, lines[i].id);
+}
+
+ClearMarker(&laser_marker);
+ClearMarker(&laser_dot_marker);
+for (size_t i = 0; i < lines.size(); ++i){
+  DrawLine(lines[i].p0 - lines[i].l/2, lines[i].p0 + lines[i].l/2, &laser_marker);
+  DrawPoint(lines[i].pScreen, &laser_dot_marker);
 }
 
   // Publshing point cloud
@@ -628,6 +671,7 @@ ransacPublisher.publish(filtered_point_cloud_msg);
 
 int main(int argc, char **argv) {
   InitMarkers();
+  initLineIDs();
   ros::init(argc, argv, "compsci403_final");
   ros::NodeHandle n;
   kinectT << 0.0, 0.0, screenHeight/2;
@@ -636,7 +680,7 @@ int main(int argc, char **argv) {
   kinectR.row(1) <<         0,        1,        0;
   kinectR.row(2) <<-sin(kinectTheta), 0, cos(kinectTheta);
 
-  MarkerArray markers;
+  /*MarkerArray markers;
   markers.markers.clear();
 
   //test to see if displayScreen works
@@ -646,8 +690,8 @@ int main(int argc, char **argv) {
   //test to see if displayLines works
   vector<line> lines;
   line lineOne;
-  Vector3f p0test(1,0,0);
-  Vector3f ltest(0, 0, .75);
+  Vector3f p0test(0.5,0.5,.5);
+  Vector3f ltest(1.3, 1, 1.5);
   lineOne.l = ltest;
   lineOne.p0 = p0test;
   lines.push_back(lineOne);
@@ -655,30 +699,31 @@ int main(int argc, char **argv) {
 
   //test to see if displayPoints work
   //const vector<Vector3f> laserpointers
-  //vector<Vector3f> laserpointers;
-  //Vector3f pointTest(1,0,0);
-  //laserpointers.push_back(pointTest);
-  //displayPoints(laserpointers);
+  vector<Vector3f> laserpointers;
+  Vector3f pointTest(1,0,0);
+  laserpointers.push_back(pointTest);
+  displayPoints(laserpointers);
 
   //test to see if checkLine is right
   //line line, Rectangle screen, Vector3f *intersection
   //lineIntersectPlane(line line) returns Vector3f intersection
   vector<Vector3f> intersectionpoints;
-  vector<bool> isIntersect;
   for(size_t i = 0; i<lines.size(); ++i){
-  	cout << "line.p0:\n" << lines[i].p0 << "line.l\n" << lines[i].l;
     Vector3f intersectionpt;
-    bool intersectbool = false;
-    intersectionpt = lineIntersectPlane(lines[i], &intersectbool);
+    intersectionpt.x() = 0;
+    intersectionpt.y() = 0;
+    intersectionpt.z() = 0;
+    intersectionpt = lineIntersectPlane(lines[i]);
     intersectionpoints.push_back(intersectionpt);
-    isIntersect.push_back(intersectbool);
   }
-    displayPoints(intersectionpoints, isIntersect);
+    displayPoints(intersectionpoints);
 
 
   markers.markers.push_back(screen_marker);
   markers.markers.push_back(laser_dot_marker);
-  markers.markers.push_back(laser_marker);
+  markers.markers.push_back(laser_marker);*/
+
+  displayScreen();
 
 
   PointCloudPublisher = 
