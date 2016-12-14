@@ -92,6 +92,8 @@ const Vector3f screenN(1, 0, 0);
 const float screenWidth = 1.3;
 const float screenHeight = 1;
 
+const unsigned int maxLines = 10;
+
 Vector3f kinectT;
 float kinectTheta;
 Matrix3f kinectR;
@@ -325,7 +327,9 @@ struct line getBestFitLine(vector<Vector3f> point_cloud){
 
   MatrixXf M(point_cloud.size(), 3);
   for (size_t i = 0; i < point_cloud.size(); ++i){
-    M.row(i) = point_cloud[i];
+    M(i, 0) = point_cloud[i](0) - l.p0(0);
+    M(i, 1) = point_cloud[i](1) - l.p0(1);
+    M(i, 2) = point_cloud[i](2) - l.p0(2);
   }
 
   Matrix3f A = M.transpose()*M;
@@ -336,19 +340,20 @@ struct line getBestFitLine(vector<Vector3f> point_cloud){
   Vector3f eigen_values = eigen_solver.eigenvalues().real();
   Matrix3f eigen_vectors = eigen_solver.eigenvectors().real();
 
-  int null_space_iVector = 0;
-  int smallest_eigen_value = fabs(eigen_values(null_space_iVector));
+  int index_iVector = 0;
+  float largest_eigen_value = fabs(eigen_values(index_iVector));
 
-  for (size_t i = 1; i < 3; ++i){
-    int new_eigen_value = fabs(eigen_values(i));
-    if (new_eigen_value < smallest_eigen_value){
-      null_space_iVector = i;
-      smallest_eigen_value = new_eigen_value;
+  for (size_t i = 0; i < 3; ++i){
+    float new_eigen_value = fabs(eigen_values(i));
+    ROS_INFO("eigen val: %f", eigen_values(i));
+    if (new_eigen_value > largest_eigen_value){
+      index_iVector = i;
+      largest_eigen_value = new_eigen_value;
     }
   }
+  ROS_INFO("largest_eigen_value: %f", largest_eigen_value);
 
-  l.l = eigen_vectors.col(null_space_iVector);
-
+  l.l = eigen_vectors.col(index_iVector);
 
   return l;
 }
@@ -462,6 +467,15 @@ void FSLF(vector<Vector3f> point_cloud,
           break;
         }
       }
+      if (pIsValid){
+        for(size_t i = 0; i < lines.size(); ++i){
+          if ((lines[i].p0 - p).norm() < safetyDist){
+            pIsValid = false;
+            --k;
+            break;
+          }
+        }
+      }
     }
     if (k <= 0){
       break;
@@ -545,7 +559,7 @@ vector< vector<Vector3f> > newfiltered_point_clouds;
 vector<struct line> newlines;
 
 for (size_t i = 0; i < last_found_lines.size(); ++i){
-  FSLF(point_cloud, getWindow(point_cloud, last_found_lines[i].p0, 0.25), 1, 15, 0.7, lines, &newfiltered_point_clouds, &newlines);
+  FSLF(point_cloud, getWindow(point_cloud, last_found_lines[i].p0, 0.15), 1, 15, 0.7, lines, &newfiltered_point_clouds, &newlines);
   for(size_t i = 0; i < newlines.size(); ++i){
     lines.push_back(newlines[i]);
   }
@@ -554,7 +568,7 @@ for (size_t i = 0; i < last_found_lines.size(); ++i){
   }
 }
 
-FSLF(point_cloud, point_cloud, 1, 40, 0.8, lines, &newfiltered_point_clouds, &newlines);
+FSLF(point_cloud, point_cloud, maxLines - lines.size(), 40, 0.7, lines, &newfiltered_point_clouds, &newlines);
 for(size_t i = 0; i < newlines.size(); ++i){
   lines.push_back(newlines[i]);
 }
@@ -566,7 +580,7 @@ ROS_INFO("found %d lines", lines.size());
 
 ClearMarker(&laser_marker);
 for (size_t i = 0; i < lines.size(); ++i){
-  DrawLine(lines[i].p0, lines[i].l + lines[i].p0, &laser_marker);
+  DrawLine(lines[i].p0 - lines[i].l/2, lines[i].p0 + lines[i].l/2, &laser_marker);
 }
 
   // Publshing point cloud
