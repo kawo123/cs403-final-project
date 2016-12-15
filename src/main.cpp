@@ -93,8 +93,8 @@ const float Kinect_max_range = 10;
 //projector screen plane
 const Vector3f screenP0(0, 0, 0); // The screen is at the origin the kinect position should be relitive to the screen
 const Vector3f screenN(1, 0, 0);
-const float screenWidth = 1.3;
-const float screenHeight = 1;
+const float screenWidth = 2.7;
+const float screenHeight = 2;
 
 const unsigned int maxLines = 10;
 bool lineIDs[maxLines];
@@ -127,7 +127,7 @@ void initLineIDs(){
 
 // Initialize all markers.
 void InitMarkers() {
-  screen_marker.header.frame_id = "camera_depth_frame";
+  screen_marker.header.frame_id = "camera_depth_optical_frame";
   screen_marker.id = 1;
   screen_marker.type = Marker::LINE_LIST;
   screen_marker.action = Marker::MODIFY;
@@ -138,7 +138,7 @@ void InitMarkers() {
   screen_marker.color.g = 1.0;
   screen_marker.color.b = 0.0;
 
-  laser_marker.header.frame_id = "camera_depth_frame";
+  laser_marker.header.frame_id = "camera_depth_optical_frame";
   laser_marker.id =2;
   laser_marker.type = Marker::LINE_LIST;
   laser_marker.action = Marker::MODIFY;
@@ -149,7 +149,7 @@ void InitMarkers() {
   laser_marker.color.g = 0.0;
   laser_marker.color.b = 0.0;
 
-  laser_dot_marker.header.frame_id = "camera_depth_frame";
+  laser_dot_marker.header.frame_id = "camera_depth_optical_frame";
   laser_dot_marker.id = 3;
   laser_dot_marker.type = Marker::POINTS;
   laser_dot_marker.action = Marker::MODIFY;
@@ -419,7 +419,7 @@ bool RANSAC(vector<Vector3f> point_cloud, vector<Vector3f>* filtered_point_cloud
   float best_inlier_fraction = 0;
   float dist_epsilon = 0.08;
   float inlier_fraction = 0.0; 
-  float min_inlier_fraction = 0.45;
+  float min_inlier_fraction = 0.30;
 
 
   // RANSAC for line
@@ -521,7 +521,7 @@ void FSLF(vector<Vector3f> point_cloud,
       float centered_window_percent_inliers = ((float)filtered_point_cloud.size())/((float)getWindow(point_cloud, newLine.p0, window_size).size());
       ROS_INFO("centered percent inliers: %f", centered_window_percent_inliers);
 
-      if (centered_window_percent_inliers >= 0.45){
+      if (centered_window_percent_inliers >= 0.30){
         inlier_point_clouds.push_back(filtered_point_cloud);
         lineIntersectPlane(&newLine);
         lines.push_back(newLine);
@@ -567,8 +567,8 @@ void DepthImageCallback(const sensor_msgs::PointCloud2& point_cloud2){
 
   vector<Vector3f> point_cloud;
   for (size_t i = 0; i < temp2_point_cloud.size(); ++i){
-   Vector3f P = temp2_point_cloud[i];
-   //P = kinectR*P + kinectT; //rotate the kinect image
+   Vector3f P(temp2_point_cloud[i].z(), -temp2_point_cloud[i].x(), -temp2_point_cloud[i].y());
+   P = kinectR*P + kinectT; //rotate the kinect image
    point_cloud.push_back(P);
   }
 
@@ -772,7 +772,7 @@ int main(int argc, char **argv) {
   //n.subscribe("/Cobot/Kinect/Depth", 1, DepthImageCallback);
   n.subscribe("/camera/depth/points", 1, DepthImageCallback);
   
-  ros::Rate loop_rate(10);
+  ros::Rate loop_rate(1);
 
   while(ros::ok()){
     MarkerArray markers;
