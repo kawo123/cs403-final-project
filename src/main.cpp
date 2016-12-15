@@ -127,7 +127,7 @@ void initLineIDs(){
 
 // Initialize all markers.
 void InitMarkers() {
-  screen_marker.header.frame_id = "kinect_0";//"camera_depth_optical_frame";
+  screen_marker.header.frame_id = "camera_depth_frame";
   screen_marker.id = 1;
   screen_marker.type = Marker::LINE_LIST;
   screen_marker.action = Marker::MODIFY;
@@ -138,7 +138,7 @@ void InitMarkers() {
   screen_marker.color.g = 1.0;
   screen_marker.color.b = 0.0;
 
-  laser_marker.header.frame_id = "kinect_0";//"camera_depth_optical_frame";
+  laser_marker.header.frame_id = "camera_depth_frame";
   laser_marker.id =2;
   laser_marker.type = Marker::LINE_LIST;
   laser_marker.action = Marker::MODIFY;
@@ -149,7 +149,7 @@ void InitMarkers() {
   laser_marker.color.g = 0.0;
   laser_marker.color.b = 0.0;
 
-  laser_dot_marker.header.frame_id = "kinect_0";//"camera_depth_optical_frame";
+  laser_dot_marker.header.frame_id = "camera_depth_frame";
   laser_dot_marker.id = 3;
   laser_dot_marker.type = Marker::POINTS;
   laser_dot_marker.action = Marker::MODIFY;
@@ -481,7 +481,6 @@ void FSLF(vector<Vector3f> point_cloud,
 
   vector< vector<Vector3f> > inlier_point_clouds;
   vector<struct line> lines; 
-  unsigned int minWindowpoints = 100;
   float safetyDist = 0.7;
 
   do{
@@ -548,8 +547,33 @@ unsigned int getNewLineID(){
   return 0;
 }
 
-void DepthImageCallback(const sensor_msgs::Image& depth_image){
-  vector<Vector3f> temp_point_cloud;
+Vector3f ConvertPCLPointXYZToVector(const pcl::PointXYZ& point) {
+  return Vector3f(point.x, point.y, point.z);
+}
+
+void DepthImageCallback(const sensor_msgs::PointCloud2& point_cloud2){
+  pcl::PCLPointCloud2 pcl_pc2;
+
+  pcl_conversions::toPCL(point_cloud2, pcl_pc2);
+  pcl::PointCloud<pcl::PointXYZ> temp1_point_cloud;
+
+  pcl::fromPCLPointCloud2(pcl_pc2, temp1_point_cloud);
+
+  vector<Vector3f> temp2_point_cloud;
+
+  for(size_t i = 0; i < temp1_point_cloud.size(); ++i){
+    temp2_point_cloud.push_back(ConvertPCLPointXYZToVector(temp1_point_cloud[i]));
+  }
+
+  vector<Vector3f> point_cloud;
+  for (size_t i = 0; i < temp2_point_cloud.size(); ++i){
+   Vector3f P = temp2_point_cloud[i];
+   //P = kinectR*P + kinectT; //rotate the kinect image
+   point_cloud.push_back(P);
+  }
+
+
+  /*vector<Vector3f> temp_point_cloud;
   int count = 10;
 
     // Setting random seed
@@ -588,12 +612,7 @@ for (size_t i = 0; i < temp_point_cloud.size(); ++i){
       //P = kinectR*P + kinectT; //rotate the kinect image
    point_cloud.push_back(P);
  }
-}
-
-  //ransac for cylinders
-  // GetCylinderFilteredPointCloud(depth_image, point_cloud, filtered_point_cloud);
-
-  //RANSAC(point_cloud, &filtered_point_cloud);
+}*/
 
 vector< vector<Vector3f> > filtered_point_clouds; 
 vector<struct line> lines;
@@ -626,7 +645,7 @@ for(size_t i = 0; i < newfiltered_point_clouds.size(); ++i){
   filtered_point_clouds.push_back(newfiltered_point_clouds[i]);
 }
 last_found_lines = lines;
-ROS_INFO("found %d lines", lines.size());
+ROS_INFO("found %lu lines", lines.size());
 
 for (size_t i = 0; i < lines.size(); ++i){
   ROS_INFO("line: %lu, id: %u", i + 1, lines[i].id);
@@ -641,7 +660,7 @@ for (size_t i = 0; i < lines.size(); ++i){
 
   // Publshing point cloud
 sensor_msgs::PointCloud point_cloud_msg;
-point_cloud_msg.header = depth_image.header;
+point_cloud_msg.header = point_cloud2.header;
 point_cloud_msg.points.resize(point_cloud.size());
 for (size_t i = 0; i < point_cloud.size(); ++i) {
  point_cloud_msg.points[i] = ConvertVectorToPoint32(point_cloud[i]);
@@ -651,7 +670,7 @@ ROS_INFO("DepthImageCallback called");
 
   // publishing filtered point cloud
 sensor_msgs::PointCloud filtered_point_cloud_msg;
-filtered_point_cloud_msg.header = depth_image.header;
+filtered_point_cloud_msg.header = point_cloud2.header;
 
 size_t size = 0;
 for (size_t i = 0; i < filtered_point_clouds.size(); ++i){
@@ -750,8 +769,8 @@ int main(int argc, char **argv) {
   
 
   ros::Subscriber depth_image_subscriber =
-  n.subscribe("/Cobot/Kinect/Depth", 1, DepthImageCallback);
-  //n.subscribe("/camera/depth/points", 1, DepthImageCallback);
+  //n.subscribe("/Cobot/Kinect/Depth", 1, DepthImageCallback);
+  n.subscribe("/camera/depth/points", 1, DepthImageCallback);
   
   ros::Rate loop_rate(10);
 
