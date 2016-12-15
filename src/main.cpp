@@ -225,11 +225,11 @@ void ClearMarker(Marker* marker){
     return sqrt(pow(diffX, 2) + pow(diffY, 2) + pow(diffZ, 2));
   }
 
-bool checkLine(line line){
-  if (line.pScreen.y() < -screenWidth/2 || 
-      line.pScreen.y() > screenWidth/2 || 
-      line.pScreen.z() < -screenHeight/2 || 
-      line.pScreen.z() > screenHeight/2){
+bool checkLine(line l, float scaler){
+  if (l.pScreen.y() < -(screenWidth*scaler)/2 || 
+      l.pScreen.y() > (screenWidth*scaler)/2 || 
+      l.pScreen.z() < -(screenHeight*scaler)/2 || 
+      l.pScreen.z() > (screenHeight*scaler)/2){
     return false;
   }
   return true;
@@ -341,9 +341,26 @@ bool lineIntersectPlane(line* l){
   return true;
 }
 
+Vector3f getCenterOfMass(vector<Vector3f> point_cloud){
+  Vector3f p;
+  p(0) = 0;
+  p(1) = 0;
+  p(2) = 0;
+  for (size_t i = 0; i < point_cloud.size(); ++i){
+    p(0) += point_cloud[i](0);
+    p(1) += point_cloud[i](1);
+    p(2) += point_cloud[i](2);
+  }
+  p(0) = p(0)/point_cloud.size();
+  p(1) = p(1)/point_cloud.size();
+  p(2) = p(2)/point_cloud.size();
+
+  return p;
+}
+
 struct line getBestFitLine(vector<Vector3f> point_cloud){
   struct line l;
-  l.p0(0) = 0;
+  /*l.p0(0) = 0;
   l.p0(1) = 0;
   l.p0(2) = 0;
   for (size_t i = 0; i < point_cloud.size(); ++i){
@@ -353,7 +370,9 @@ struct line getBestFitLine(vector<Vector3f> point_cloud){
   }
   l.p0(0) = l.p0(0)/point_cloud.size();
   l.p0(1) = l.p0(1)/point_cloud.size();
-  l.p0(2) = l.p0(2)/point_cloud.size();
+  l.p0(2) = l.p0(2)/point_cloud.size();*/
+
+  l.p0 = getCenterOfMass(point_cloud);
 
   MatrixXf M(point_cloud.size(), 3);
   for (size_t i = 0; i < point_cloud.size(); ++i){
@@ -419,22 +438,31 @@ bool RANSAC(vector<Vector3f> point_cloud, vector<Vector3f>* filtered_point_cloud
   float best_inlier_fraction = 0;
   float dist_epsilon = 0.08;
   float inlier_fraction = 0.0; 
-  float min_inlier_fraction = 0.30;
+  float min_inlier_fraction = 0.40;
 
 
   // RANSAC for line
-  for(size_t i = 0; i < 20; ++i) {
+  for(size_t i = 0; i < 38; ++i) {
     Vector3f P1 = point_cloud[rand() % point_cloud.size()];
     Vector3f P2 = point_cloud[rand() % point_cloud.size()];
 
-    vector<Vector3f> new_inliers;
-    FindInliers(P1, P2, dist_epsilon, point_cloud, &new_inliers);
+    struct line newLine;
+    newLine.p0 = P1;
+    newLine.l = P2 - P1;
+    newLine.l = newLine.l/newLine.l.norm();
+    lineIntersectPlane(&newLine);
 
-    inlier_fraction = static_cast<float>(new_inliers.size()) / static_cast<float>(point_cloud.size());
-    //printf("In RANSAC: the inlier_fraction is %f\n", inlier_fraction);
-    if (inlier_fraction > min_inlier_fraction && inlier_fraction > best_inlier_fraction) {
-      best_inlier_fraction = inlier_fraction;
-      inliers = new_inliers;
+    if (checkLine(newLine, 1.2)){
+
+      vector<Vector3f> new_inliers;
+      FindInliers(P1, P2, dist_epsilon, point_cloud, &new_inliers);
+
+      inlier_fraction = static_cast<float>(new_inliers.size()) / static_cast<float>(point_cloud.size());
+      //printf("In RANSAC: the inlier_fraction is %f\n", inlier_fraction);
+      if (inlier_fraction > min_inlier_fraction && inlier_fraction > best_inlier_fraction) {
+        best_inlier_fraction = inlier_fraction;
+        inliers = new_inliers;
+      }
     }
   }
   if (best_inlier_fraction == 0){
@@ -466,6 +494,27 @@ vector<Vector3f> getWindow(const vector<Vector3f> point_cloud,
 return window;
 }
 
+vector<Vector3f> removeWindow(const vector<Vector3f> point_cloud, 
+                              const Vector3f p, 
+                              const float window_size){
+  vector<Vector3f> window;
+  const float w = window_size/2;
+  const float Xmax = p.x() + w;
+  const float Xmin = p.x() - w;
+  const float Ymax = p.y() + w;
+  const float Ymin = p.y() - w;
+  const float Zmax = p.z() + w;
+  const float Zmin = p.z() - w;
+  for (size_t i = 0; i < point_cloud.size(); ++i){
+    if (point_cloud[i].x() < Xmin || point_cloud[i].x() > Xmax 
+      || point_cloud[i].y() < Ymin || point_cloud[i].y() > Ymax
+      || point_cloud[i].z() < Zmin || point_cloud[i].z() > Zmax){
+     window.push_back(point_cloud[i]);
+ }
+}
+return window;
+}
+
 void FSLF(vector<Vector3f> point_cloud,
           vector<Vector3f> sample_point_cloud, 
           unsigned int n, 
@@ -479,11 +528,20 @@ void FSLF(vector<Vector3f> point_cloud,
     return;
   }
 
+  bool tracking = false;
+  if (point_cloud.size() > sample_point_cloud.size()){
+    tracking = true;
+  }
+
   vector< vector<Vector3f> > inlier_point_clouds;
-  vector<struct line> lines; 
-  float safetyDist = 0.7;
+  vector<struct line> lines;
+  vector<Vector3f> sampled_spaces;
+  float safetyDist = 1.3;
 
   do{
+    if (point_cloud.size() == 0 || sample_point_cloud.size() == 0){
+      break;
+    }
     if (inlier_point_clouds.size() > n - 1){
       break;
     }
@@ -508,28 +566,51 @@ void FSLF(vector<Vector3f> point_cloud,
           }
         }
       }
+      /*if (point_cloud.size() <= sample_point_cloud.size() && pIsValid){
+        for(size_t i = 0; i < sampled_spaces.size(); ++i){
+          if ((sampled_spaces[i] - p).norm() < safetyDist){
+            pIsValid = false;
+            --k;
+            break;
+          }
+        }
+      }*/
     }
     if (k <= 0){
       break;
     }
+    //DrawPoint(p, &laser_dot_marker);
+    //sampled_spaces.push_back(p);
     vector<Vector3f> point_cloud_window = getWindow(point_cloud, p, window_size);
 
     vector<Vector3f> filtered_point_cloud;
     if (RANSAC(point_cloud_window, &filtered_point_cloud)){
       ROS_INFO("found a line");
-      struct line newLine = getBestFitLine(filtered_point_cloud);
-      float centered_window_percent_inliers = ((float)filtered_point_cloud.size())/((float)getWindow(point_cloud, newLine.p0, window_size).size());
+      float centered_window_percent_inliers = ((float)filtered_point_cloud.size())/
+                                              ((float)getWindow(point_cloud, getCenterOfMass(filtered_point_cloud), window_size).size());
       ROS_INFO("centered percent inliers: %f", centered_window_percent_inliers);
 
-      if (centered_window_percent_inliers >= 0.30){
-        inlier_point_clouds.push_back(filtered_point_cloud);
+      if (centered_window_percent_inliers >= 0.38){
+        struct line newLine = getBestFitLine(filtered_point_cloud);
         lineIntersectPlane(&newLine);
-        lines.push_back(newLine);
+        //if (checkLine(newLine, 1.0)){
+          inlier_point_clouds.push_back(filtered_point_cloud);
+          lines.push_back(newLine);
+        //}
+        //else if (!tracking){
+          //sample_point_cloud = removeWindow(sample_point_cloud, p, 0.5);
+        //}
+      }
+      else if (!tracking){
+        sample_point_cloud = removeWindow(sample_point_cloud, p, 0.5);
       }
     
       if (inlier_point_clouds.size() > n - 1){
         break;
       }
+    }
+    else if (!tracking){
+      sample_point_cloud = removeWindow(sample_point_cloud, p, 0.5);
     }
   k--;
   }while(k > 0);
@@ -567,9 +648,9 @@ void DepthImageCallback(const sensor_msgs::PointCloud2& point_cloud2){
 
   vector<Vector3f> point_cloud;
   for (size_t i = 0; i < temp2_point_cloud.size(); ++i){
-   Vector3f P(temp2_point_cloud[i].z(), -temp2_point_cloud[i].x(), -temp2_point_cloud[i].y());
-   P = kinectR*P + kinectT; //rotate the kinect image
-   point_cloud.push_back(P);
+    Vector3f P(temp2_point_cloud[i].z(), -temp2_point_cloud[i].x(), -temp2_point_cloud[i].y());
+    P = kinectR*P + kinectT; //rotate the kinect image
+    point_cloud.push_back(P);
   }
 
 
@@ -620,8 +701,11 @@ vector<struct line> lines;
 vector< vector<Vector3f> > newfiltered_point_clouds;
 vector<struct line> newlines;
 
+ClearMarker(&laser_marker);
+ClearMarker(&laser_dot_marker);
+
 for (size_t i = 0; i < last_found_lines.size(); ++i){
-  FSLF(point_cloud, getWindow(point_cloud, last_found_lines[i].p0, 0.15), 1, 20, 0.7, lines, &newfiltered_point_clouds, &newlines);
+  FSLF(point_cloud, getWindow(point_cloud, last_found_lines[i].p0, 0.15), 1, 10, 0.7, lines, &newfiltered_point_clouds, &newlines);
   if (newlines.size() > 0){
     for(size_t j = 0; j < newlines.size(); ++j){
       newlines[j].id = last_found_lines[i].id;
@@ -636,7 +720,7 @@ for (size_t i = 0; i < last_found_lines.size(); ++i){
   }
 }
 
-FSLF(point_cloud, point_cloud, maxLines - lines.size(), 40, 0.7, lines, &newfiltered_point_clouds, &newlines);
+FSLF(point_cloud, point_cloud, maxLines - lines.size(), 45, 0.7, lines, &newfiltered_point_clouds, &newlines);
 for(size_t i = 0; i < newlines.size(); ++i){
   newlines[i].id = getNewLineID();
   lines.push_back(newlines[i]);
@@ -651,8 +735,8 @@ for (size_t i = 0; i < lines.size(); ++i){
   ROS_INFO("line: %lu, id: %u", i + 1, lines[i].id);
 }
 
-ClearMarker(&laser_marker);
-ClearMarker(&laser_dot_marker);
+//ClearMarker(&laser_marker);
+//ClearMarker(&laser_dot_marker);
 for (size_t i = 0; i < lines.size(); ++i){
   DrawLine(lines[i].p0 - lines[i].l/2, lines[i].p0 + lines[i].l/2, &laser_marker);
   DrawPoint(lines[i].pScreen, &laser_dot_marker);
@@ -707,7 +791,7 @@ int main(int argc, char **argv) {
   ros::init(argc, argv, "compsci403_final");
   ros::NodeHandle n;
   kinectT << 0.0, 0.0, screenHeight/2;
-  kinectTheta = PI/4;//45 degrees
+  kinectTheta = 36.0*(PI/180.0);
   kinectR.row(0) << cos(kinectTheta), 0, sin(kinectTheta);//turn down about y axis
   kinectR.row(1) <<         0,        1,        0;
   kinectR.row(2) <<-sin(kinectTheta), 0, cos(kinectTheta);
